@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>التسجيل | صيف الابتكار 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  :root{
+    --navy:#0B1B3F; --navy-2:#132a5c; --gold:#E7B10A; --gold-2:#f7cf4d;
+    --cream:#FBF6E9; --ink:#1c2230; --line:#e7ddc0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:'IBM Plex Sans Arabic',sans-serif;}
+  h1,h2,h3,.display{font-family:'Tajawal',sans-serif;}
+
+  .hero{
+    position:relative;background:var(--navy);color:#fff;overflow:hidden;
+    padding:38px 20px 54px;
+  }
+  .hero::before, .hero::after{
+    content:"";position:absolute;height:3px;background:var(--gold);width:140%;
+    transform:rotate(-8deg);
+  }
+  .hero::before{top:14px;left:-40px;}
+  .hero::after{top:26px;left:-40px;opacity:.5;}
+  .hero-inner{position:relative;max-width:720px;margin:0 auto;text-align:center;padding-top:20px;}
+  .eyebrow{color:var(--gold-2);font-weight:600;letter-spacing:.5px;font-size:14px;margin-bottom:6px;}
+  .hero h1{font-size:38px;font-weight:900;margin:4px 0 2px;}
+  .hero .sub{font-size:16px;font-weight:500;opacity:.85;margin-top:4px;}
+  .badge-year{display:inline-block;margin-top:14px;background:var(--gold);color:var(--navy);
+    font-weight:700;padding:5px 18px;border-radius:999px;font-size:14px;}
+
+  main{max-width:720px;margin:-28px auto 60px;padding:0 18px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 22px;
+    box-shadow:0 10px 30px rgba(11,27,63,.07);margin-bottom:18px;}
+  .card h2{font-size:19px;margin:0 0 14px;color:var(--navy);border-right:4px solid var(--gold);padding-right:10px;}
+
+  label{display:block;font-size:14px;font-weight:600;margin:14px 0 6px;color:var(--navy-2);}
+  input, select{
+    width:100%;padding:12px 14px;border:1.5px solid #dcd3b8;border-radius:10px;
+    font-family:inherit;font-size:15px;background:#fffdf7;transition:.15s;
+  }
+  input:focus, select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(231,177,10,.18);}
+
+  .tracks{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+  @media(max-width:520px){.tracks{grid-template-columns:1fr;}}
+  .track-opt{position:relative;}
+  .track-opt input{position:absolute;opacity:0;inset:0;cursor:pointer;width:100%;height:100%;}
+  .track-card{
+    border:1.5px solid #dcd3b8;border-radius:12px;padding:12px 14px;background:#fffdf7;cursor:pointer;
+  }
+  .track-opt input:checked + .track-card{
+    border-color:var(--navy);background:linear-gradient(0deg,#fff,#fff),var(--navy);
+    background:#0B1B3F0d;border-color:var(--navy);box-shadow:inset 0 0 0 1.5px var(--navy);
+  }
+  .track-name{font-weight:700;font-size:14.5px;color:var(--navy);}
+  .track-dates{font-size:12.5px;color:#6b7280;margin-top:3px;}
+
+  button.submit{
+    width:100%;margin-top:20px;background:var(--gold);color:var(--navy);border:none;
+    padding:14px;border-radius:10px;font-family:'Tajawal',sans-serif;font-weight:700;font-size:16px;
+    cursor:pointer;transition:.15s;
+  }
+  button.submit:hover{background:var(--gold-2);}
+  button.submit:disabled{opacity:.6;cursor:not-allowed;}
+
+  .msg{font-size:13.5px;margin-top:10px;padding:10px 12px;border-radius:8px;display:none;}
+  .msg.error{background:#fdecec;color:#9c2b2b;display:block;}
+
+  .success{display:none;text-align:center;}
+  .success.show{display:block;}
+  .success canvas{margin:14px auto;border:8px solid #fff;border-radius:12px;box-shadow:0 6px 20px rgba(11,27,63,.12);}
+  .success h2{border:none;padding:0;text-align:center;}
+  .note{font-size:13px;color:#6b7280;line-height:1.9;}
+  .form-wrap.hide{display:none;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">جامعة القصيم · مركز الابتكار والملكية الفكرية</div>
+    <h1>صيف الابتكار</h1>
+    <div class="sub">Innovation Summer — التسجيل في البرنامج التدريبي</div>
+    <div class="badge-year">2026</div>
+  </div>
+</div>
+
+<main>
+  <div class="card form-wrap" id="formWrap">
+    <h2>بيانات التسجيل</h2>
+    <form id="regForm">
+      <label>الاسم الكامل</label>
+      <input type="text" id="full_name" required placeholder="مثال: عبدالله محمد">
+
+      <label>البريد الإلكتروني</label>
+      <input type="email" id="email" required placeholder="name@example.com">
+
+      <label>رقم الجوال</label>
+      <input type="tel" id="phone" required placeholder="05xxxxxxxx">
+
+      <label>الجهة (الجامعة / الشركة)</label>
+      <input type="text" id="organization" placeholder="اختياري">
+
+      <label>اختر مسارًا واحدًا</label>
+      <div class="tracks" id="tracksGrid">
+        <!-- تُبنى ديناميكيًا من قاعدة البيانات -->
+      </div>
+
+      <div class="msg error" id="errMsg"></div>
+      <button class="submit" type="submit" id="submitBtn">تأكيد التسجيل</button>
+    </form>
+  </div>
+
+  <div class="card success" id="successCard">
+    <h2>✅ تم تسجيلك بنجاح</h2>
+    <p style="text-align:center;color:#4b5563;" id="successSummary"></p>
+    <canvas id="qrCanvas"></canvas>
+    <p class="note" style="text-align:center;">
+      احتفظ بهذا الرمز (QR) — سيُستخدم لتسجيل حضورك اليومي، ويُعتمد عليه لاحقًا في إصدار شهادتك.<br>
+      يمكنك أخذ لقطة شاشة له الآن.
+    </p>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script>
+let tracksData = [];
+
+async function loadTracks(){
+  const { data, error } = await supabaseClient.from('tracks').select('*').order('day1_date');
+  tracksData = (data && data.length) ? data : FALLBACK_TRACKS;
+  const grid = document.getElementById('tracksGrid');
+  grid.innerHTML = tracksData.map((t, i) => `
+    <label class="track-opt">
+      <input type="radio" name="track" value="${t.id || t.code}" ${i===0?'required':''}>
+      <div class="track-card">
+        <div class="track-name">${t.name_ar}</div>
+        ${t.day1_date ? `<div class="track-dates">${formatRange(t.day1_date, t.day3_date)}</div>` : ''}
+      </div>
+    </label>
+  `).join('');
+}
+
+function formatRange(d1, d3){
+  const opts = {day:'numeric', month:'short'};
+  const a = new Date(d1).toLocaleDateString('ar-SA', opts);
+  const b = new Date(d3).toLocaleDateString('ar-SA', opts);
+  return `${a} – ${b}`;
+}
+
+loadTracks();
+
+document.getElementById('regForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errMsg = document.getElementById('errMsg');
+  const btn = document.getElementById('submitBtn');
+  errMsg.style.display = 'none';
+
+  const trackId = document.querySelector('input[name="track"]:checked')?.value;
+  if(!trackId){ errMsg.textContent = 'الرجاء اختيار مسار'; errMsg.style.display='block'; return; }
+
+  const payload = {
+    full_name: document.getElementById('full_name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
+    organization: document.getElementById('organization').value.trim() || null,
+    track_id: trackId,
+  };
+
+  btn.disabled = true; btn.textContent = 'جاري التسجيل...';
+
+  const { data, error } = await supabaseClient.from('participants').insert(payload).select().single();
+
+  if(error){
+    errMsg.textContent = 'تعذّر إتمام التسجيل، الرجاء المحاولة مرة أخرى. (' + error.message + ')';
+    errMsg.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'تأكيد التسجيل';
+    return;
+  }
+
+  const track = tracksData.find(t => (t.id || t.code) === trackId);
+  document.getElementById('formWrap').classList.add('hide');
+  const successCard = document.getElementById('successCard');
+  successCard.classList.add('show');
+  document.getElementById('successSummary').textContent =
+    `${payload.full_name} — مسار: ${track ? track.name_ar : ''}`;
+
+  QRCode.toCanvas(document.getElementById('qrCanvas'), data.qr_token, { width: 220, margin: 1,
+    color:{ dark:'#0B1B3F', light:'#ffffff' } });
+});
+</script>
+</body>
+</html>

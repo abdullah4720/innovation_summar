@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم | صيف الابتكار 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{--navy:#0B1B3F;--navy-2:#132a5c;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:'IBM Plex Sans Arabic',sans-serif;}
+  h1,h2,h3,.display{font-family:'Tajawal',sans-serif;}
+
+  .topbar{background:var(--navy);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;
+    position:sticky;top:0;z-index:5;}
+  .topbar h1{font-size:18px;margin:0;}
+  .topbar .right{display:flex;align-items:center;gap:14px;font-size:13px;}
+  .topbar button{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;
+    padding:6px 12px;cursor:pointer;font-family:inherit;}
+
+  main{max-width:1180px;margin:0 auto;padding:22px 18px 60px;}
+
+  .loginCard{max-width:380px;margin:60px auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;}
+  .loginCard input{width:100%;padding:12px;border:1.5px solid #dcd3b8;border-radius:10px;font-size:15px;font-family:inherit;margin-bottom:10px;}
+  .loginCard button{width:100%;background:var(--gold);color:var(--navy);border:none;border-radius:10px;
+    padding:12px;font-family:'Tajawal',sans-serif;font-weight:700;font-size:15px;cursor:pointer;}
+
+  .hide{display:none !important;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;}
+  .stat .num{font-size:26px;font-weight:900;color:var(--navy);font-family:'Tajawal',sans-serif;}
+  .stat .lbl{font-size:12.5px;color:#6b7280;margin-top:2px;}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:center;}
+  .toolbar input, .toolbar select{padding:10px 12px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;background:#fff;}
+  .toolbar input[type=search]{flex:1;min-width:180px;}
+  .btn{border:none;border-radius:10px;padding:10px 14px;font-family:'Tajawal',sans-serif;font-weight:700;font-size:14px;cursor:pointer;}
+  .btn-gold{background:var(--gold);color:var(--navy);}
+  .btn-navy{background:var(--navy);color:#fff;}
+  .btn-outline{background:#fff;border:1.5px solid var(--navy);color:var(--navy);}
+  input[type=file]{display:none;}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;
+    box-shadow:0 6px 20px rgba(11,27,63,.05);}
+  th, td{padding:10px 12px;text-align:right;font-size:13.5px;border-bottom:1px solid #f0ead4;}
+  th{background:var(--navy);color:#fff;font-weight:600;position:sticky;top:56px;}
+  tr:hover td{background:#fffdf3;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;}
+  .pill.on{background:#e8f6ec;color:#1e7a3f;}
+  .pill.off{background:#f1f1f1;color:#9ca3af;}
+  .cert-pill{background:var(--gold);color:var(--navy);}
+  .small-btn{border:none;border-radius:7px;padding:5px 9px;font-size:12px;cursor:pointer;font-family:inherit;}
+  .table-wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+
+<div class="loginCard" id="loginCard">
+  <h2 style="margin-top:0;">دخول فريق الإدارة</h2>
+  <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+  <input type="password" id="loginPass" placeholder="كلمة المرور">
+  <button onclick="login()">دخول</button>
+  <div id="loginErr" style="color:#9c2b2b;font-size:13px;margin-top:8px;"></div>
+</div>
+
+<div id="app" class="hide">
+  <div class="topbar">
+    <h1>لوحة تحكم صيف الابتكار 2026</h1>
+    <div class="right">
+      <span id="whoami"></span>
+      <button onclick="logout()">تسجيل الخروج</button>
+    </div>
+  </div>
+
+  <main>
+    <div class="stats" id="statsRow"></div>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="بحث بالاسم أو البريد..." oninput="renderTable()">
+      <select id="trackFilter" onchange="renderTable()"><option value="">كل المسارات</option></select>
+      <button class="btn btn-outline" onclick="document.getElementById('fileImport').click()">استيراد Excel</button>
+      <input type="file" id="fileImport" accept=".xlsx,.xls,.csv" onchange="importExcel(event)">
+      <button class="btn btn-navy" onclick="exportExcel()">تصدير Excel</button>
+      <button class="btn btn-gold" onclick="issueSelectedCertificates()">إصدار شهادات لمن أتمّ الحضور</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>الاسم</th><th>البريد</th><th>الجوال</th><th>المسار</th>
+            <th>1</th><th>2</th><th>3</th><th>الشهادة</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script>
+let participants = [];
+let tracks = [];
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if(session){
+    document.getElementById('loginCard').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
+    document.getElementById('whoami').textContent = session.user.email;
+    loadAll();
+  }
+});
+
+async function login(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error) document.getElementById('loginErr').textContent = 'بيانات الدخول غير صحيحة';
+}
+function logout(){ supabaseClient.auth.signOut(); location.reload(); }
+
+async function loadAll(){
+  const { data: t } = await supabaseClient.from('tracks').select('*').order('day1_date');
+  tracks = t || [];
+  const sel = document.getElementById('trackFilter');
+  sel.innerHTML = '<option value="">كل المسارات</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
+
+  const { data: p } = await supabaseClient.from('participants').select('*, tracks(*)').order('registered_at', {ascending:false});
+  participants = p || [];
+  renderStats();
+  renderTable();
+}
+
+function renderStats(){
+  const total = participants.length;
+  const certified = participants.filter(p => p.certificate_issued).length;
+  const fullyAttended = participants.filter(p => p.day1_attended && p.day2_attended && p.day3_attended).length;
+  const perTrack = tracks.map(t => ({
+    name: t.name_ar,
+    count: participants.filter(p => p.track_id === t.id).length
+  }));
+
+  let html = `
+    <div class="stat"><div class="num">${total}</div><div class="lbl">إجمالي المسجلين</div></div>
+    <div class="stat"><div class="num">${fullyAttended}</div><div class="lbl">أتموا الحضور (3 أيام)</div></div>
+    <div class="stat"><div class="num">${certified}</div><div class="lbl">شهادات صادرة</div></div>
+  `;
+  perTrack.forEach(t => {
+    html += `<div class="stat"><div class="num">${t.count}</div><div class="lbl">${t.name}</div></div>`;
+  });
+  document.getElementById('statsRow').innerHTML = html;
+}
+
+function renderTable(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const trackId = document.getElementById('trackFilter').value;
+
+  const filtered = participants.filter(p => {
+    const matchesQ = !q || p.full_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+    const matchesTrack = !trackId || p.track_id === trackId;
+    return matchesQ && matchesTrack;
+  });
+
+  document.getElementById('tbody').innerHTML = filtered.map(p => `
+    <tr>
+      <td>${p.full_name}</td>
+      <td>${p.email}</td>
+      <td>${p.phone || ''}</td>
+      <td>${p.tracks ? p.tracks.name_ar : ''}</td>
+      <td>${dayCell(p, 1)}</td>
+      <td>${dayCell(p, 2)}</td>
+      <td>${dayCell(p, 3)}</td>
+      <td>${p.certificate_issued
+          ? `<span class="pill cert-pill">صادرة</span>`
+          : `<button class="small-btn btn-gold" onclick="issueCertificate('${p.id}')">إصدار</button>`}</td>
+      <td>${p.certificate_issued ? `<a href="certificate.html?code=${p.certificate_code}" target="_blank" class="small-btn btn-outline">عرض</a>` : ''}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:20px;">لا توجد نتائج</td></tr>';
+}
+
+function dayCell(p, n){
+  const val = p[`day${n}_attended`];
+  return `<span class="pill ${val?'on':'off'}" style="cursor:pointer" onclick="toggleDay('${p.id}', ${n})">${val?'✓':'—'}</span>`;
+}
+
+async function toggleDay(id, n){
+  const p = participants.find(x => x.id === id);
+  const field = `day${n}_attended`;
+  const newVal = !p[field];
+  const { error } = await supabaseClient.from('participants').update({ [field]: newVal }).eq('id', id);
+  if(!error){ p[field] = newVal; renderStats(); renderTable(); }
+}
+
+function genCertCode(){
+  return 'INV-2026-' + Math.random().toString(36).slice(2,7).toUpperCase();
+}
+
+async function issueCertificate(id){
+  const p = participants.find(x => x.id === id);
+  const code = genCertCode();
+  const { error } = await supabaseClient.from('participants')
+    .update({ certificate_issued: true, certificate_code: code }).eq('id', id);
+  if(!error){ p.certificate_issued = true; p.certificate_code = code; renderStats(); renderTable(); }
+}
+
+async function issueSelectedCertificates(){
+  const eligible = participants.filter(p => p.day1_attended && p.day2_attended && p.day3_attended && !p.certificate_issued);
+  if(!eligible.length){ alert('لا يوجد مشاركون مؤهلون حاليًا (يجب حضور الأيام الثلاثة)'); return; }
+  if(!confirm(`سيتم إصدار ${eligible.length} شهادة. متابعة؟`)) return;
+
+  for(const p of eligible){
+    const code = genCertCode();
+    await supabaseClient.from('participants').update({ certificate_issued: true, certificate_code: code }).eq('id', p.id);
+    p.certificate_issued = true; p.certificate_code = code;
+  }
+  renderStats(); renderTable();
+}
+
+function exportExcel(){
+  const rows = participants.map(p => ({
+    'الاسم': p.full_name, 'البريد': p.email, 'الجوال': p.phone, 'الجهة': p.organization || '',
+    'المسار': p.tracks ? p.tracks.name_ar : '', 'اليوم 1': p.day1_attended ? 'حضر' : '',
+    'اليوم 2': p.day2_attended ? 'حضر' : '', 'اليوم 3': p.day3_attended ? 'حضر' : '',
+    'الشهادة': p.certificate_issued ? 'صادرة' : '', 'كود الشهادة': p.certificate_code || '',
+    'تاريخ التسجيل': p.registered_at
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'المشاركون');
+  XLSX.writeFile(wb, 'صيف_الابتكار_2026.xlsx');
+}
+
+async function importExcel(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+
+  // الأعمدة المتوقعة: الاسم, البريد, الجوال, الجهة, رمز_المسار (biz/agents/coding/elearn/emerging/digital)
+  let success = 0, failed = 0;
+  for(const row of rows){
+    const trackCode = (row['رمز_المسار'] || row['track_code'] || '').toString().trim();
+    const track = tracks.find(t => t.code === trackCode);
+    if(!track){ failed++; continue; }
+
+    const { error } = await supabaseClient.from('participants').insert({
+      full_name: row['الاسم'] || row['full_name'] || '',
+      email: row['البريد'] || row['email'] || '',
+      phone: String(row['الجوال'] || row['phone'] || ''),
+      organization: row['الجهة'] || row['organization'] || null,
+      track_id: track.id
+    });
+    error ? failed++ : success++;
+  }
+  alert(`تم استيراد ${success} مشارك بنجاح${failed ? ' — تعذّر استيراد ' + failed : ''}`);
+  e.target.value = '';
+  loadAll();
+}
+</script>
+</body>
+</html>

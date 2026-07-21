@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الميسّر | صيف الابتكار 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--navy:#0B1B3F;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--cream);color:var(--ink);font-family:'IBM Plex Sans Arabic',sans-serif;}
+  h1,h2,h3,.display{font-family:'Tajawal',sans-serif;}
+  .topbar{background:var(--navy);color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar h1{font-size:17px;margin:0;}
+  .topbar .right{display:flex;align-items:center;gap:12px;font-size:13px;}
+  .topbar button{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+  main{max-width:900px;margin:0 auto;padding:22px 16px 60px;}
+  .hide{display:none !important;}
+
+  .loginCard{max-width:380px;margin:60px auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px;}
+  .loginCard input{width:100%;padding:12px;border:1.5px solid #dcd3b8;border-radius:10px;font-size:15px;font-family:inherit;margin-bottom:10px;}
+  .loginCard button{width:100%;background:var(--gold);color:var(--navy);border:none;border-radius:10px;padding:12px;
+    font-family:'Tajawal',sans-serif;font-weight:700;font-size:15px;cursor:pointer;}
+
+  .banner{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;}
+  .banner .track-name{font-size:20px;font-weight:900;color:var(--navy);}
+  .stats{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+  .stat{background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13px;}
+  .stat b{display:block;font-size:20px;color:var(--navy);font-family:'Tajawal',sans-serif;}
+
+  .toolbar{display:flex;gap:10px;margin-bottom:12px;}
+  .toolbar input{flex:1;padding:10px 12px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 20px rgba(11,27,63,.05);}
+  th, td{padding:10px 12px;text-align:right;font-size:13.5px;border-bottom:1px solid #f0ead4;}
+  th{background:var(--navy);color:#fff;font-weight:600;}
+  .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;}
+  .pill.on{background:#e8f6ec;color:#1e7a3f;}
+  .pill.off{background:#f1f1f1;color:#9ca3af;}
+  .table-wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+
+<div class="loginCard" id="loginCard">
+  <h2 style="margin-top:0;">دخول الميسّر</h2>
+  <input type="email" id="loginEmail" placeholder="البريد الإلكتروني">
+  <input type="password" id="loginPass" placeholder="كلمة المرور">
+  <button onclick="login()">دخول</button>
+  <div id="loginErr" style="color:#9c2b2b;font-size:13px;margin-top:8px;"></div>
+</div>
+
+<div id="app" class="hide">
+  <div class="topbar">
+    <h1>لوحة الميسّر — صيف الابتكار</h1>
+    <div class="right"><span id="whoami"></span><button onclick="logout()">خروج</button></div>
+  </div>
+
+  <main>
+    <div class="banner">
+      <div class="track-name" id="trackName"></div>
+      <div class="stats" id="statsRow"></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="بحث بالاسم أو البريد..." oninput="renderTable()">
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>الاسم</th><th>البريد</th><th>الجوال</th><th>اليوم 1</th><th>اليوم 2</th><th>اليوم 3</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script>
+let myTrack = null;
+let participants = [];
+
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  if(session){
+    const { data: profile } = await supabaseClient.from('profiles').select('*, tracks(*)').eq('id', session.user.id).single();
+    if(!profile || profile.role !== 'facilitator' || !profile.tracks){
+      alert('هذا الحساب غير مسند كميسّر لأي مسار. تواصل مع مدير البرنامج.');
+      await supabaseClient.auth.signOut();
+      return;
+    }
+    myTrack = profile.tracks;
+    document.getElementById('loginCard').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
+    document.getElementById('whoami').textContent = session.user.email;
+    document.getElementById('trackName').textContent = myTrack.name_ar;
+    loadParticipants();
+  }
+});
+
+async function login(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if(error) document.getElementById('loginErr').textContent = 'بيانات الدخول غير صحيحة';
+}
+function logout(){ supabaseClient.auth.signOut(); location.reload(); }
+
+async function loadParticipants(){
+  // RLS تحصر النتائج تلقائيًا على مسار هذا الميسّر فقط
+  const { data } = await supabaseClient.from('participants').select('*').order('full_name');
+  participants = data || [];
+  renderStats();
+  renderTable();
+}
+
+function renderStats(){
+  const total = participants.length;
+  const d1 = participants.filter(p => p.day1_attended).length;
+  const d2 = participants.filter(p => p.day2_attended).length;
+  const d3 = participants.filter(p => p.day3_attended).length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><b>${total}</b>إجمالي المسجلين</div>
+    <div class="stat"><b>${d1}</b>حاضرون اليوم 1</div>
+    <div class="stat"><b>${d2}</b>حاضرون اليوم 2</div>
+    <div class="stat"><b>${d3}</b>حاضرون اليوم 3</div>
+  `;
+}
+
+function renderTable(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const filtered = participants.filter(p => !q || p.full_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
+  document.getElementById('tbody').innerHTML = filtered.map(p => `
+    <tr>
+      <td>${p.full_name}</td><td>${p.email}</td><td>${p.phone || ''}</td>
+      <td>${dayCell(p,1)}</td><td>${dayCell(p,2)}</td><td>${dayCell(p,3)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:20px;">لا يوجد مشاركون</td></tr>';
+}
+
+function dayCell(p, n){
+  const val = p[`day${n}_attended`];
+  return `<span class="pill ${val?'on':'off'}" onclick="toggleDay('${p.id}',${n})">${val?'حاضر ✓':'—'}</span>`;
+}
+
+async function toggleDay(id, n){
+  const p = participants.find(x => x.id === id);
+  const field = `day${n}_attended`;
+  const newVal = !p[field];
+  const { error } = await supabaseClient.from('participants').update({ [field]: newVal }).eq('id', id);
+  if(!error){ p[field] = newVal; renderStats(); renderTable(); }
+}
+</script>
+</body>
+</html>

@@ -90,6 +90,11 @@
 </div>
 
 <main>
+  <div class="card" id="closedCard" style="display:none;text-align:center;">
+    <h2 style="margin-top:0;">🌱 شكرًا لاهتمامك</h2>
+    <p id="closedMessage" style="color:#4b5563;font-size:15px;line-height:1.9;"></p>
+  </div>
+
   <div class="card form-wrap" id="formWrap">
     <h2>بيانات التسجيل</h2>
     <form id="regForm">
@@ -129,7 +134,36 @@
 <script>
 let tracksData = [];
 
+async function checkRegistrationStatus(){
+  const { data: settings } = await supabaseClient.from('app_settings').select('*').eq('id', 1).single();
+  if(!settings) return true; // لا إعدادات = افتراضيًا مفتوح
+
+  const now = new Date();
+  let closedMsg = null;
+  const customMsg = settings.registration_closed_message && settings.registration_closed_message.trim();
+
+  if(settings.registration_open === false){
+    closedMsg = customMsg || 'التسجيل مغلق حاليًا. تابعنا للإعلان عن الموعد القادم بإذن الله.';
+  } else if(settings.registration_opens_at && now < new Date(settings.registration_opens_at)){
+    const opensText = new Date(settings.registration_opens_at).toLocaleString('ar-SA', {dateStyle:'long', timeStyle:'short'});
+    closedMsg = customMsg || `لم يبدأ التسجيل بعد. يفتح التسجيل بإذن الله بتاريخ ${opensText}.`;
+  } else if(settings.registration_closes_at && now > new Date(settings.registration_closes_at)){
+    closedMsg = customMsg || 'عذرًا، انتهى وقت التسجيل. نتمنى نشوفكم في الفرصة القادمة!';
+  }
+
+  if(closedMsg){
+    document.getElementById('formWrap').style.display = 'none';
+    document.getElementById('closedCard').style.display = 'block';
+    document.getElementById('closedMessage').textContent = closedMsg;
+    return false;
+  }
+  return true;
+}
+
 async function loadTracks(){
+  const isOpen = await checkRegistrationStatus();
+  if(!isOpen) return;
+
   const { data, error } = await supabaseClient.from('tracks').select('*').order('day1_date');
   tracksData = (data && data.length) ? data : FALLBACK_TRACKS;
   const grid = document.getElementById('tracksGrid');

@@ -239,6 +239,34 @@
         </div>
         <div class="msg" id="settingsMsg" style="margin-top:10px;font-size:13px;"></div>
       </div>
+
+      <div class="card">
+        <h3>التحكم بالتسجيل</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          تحكّم فوري بفتح/إغلاق التسجيل، أو حدّد موعد فتح وإغلاق تلقائي (اتركهما فارغين لتجاهل الجدولة).
+        </p>
+
+        <div class="settings-row" style="margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--navy-2);margin:0;cursor:pointer;">
+            <input type="checkbox" id="regOpenToggle" style="width:18px;height:18px;">
+            التسجيل مفتوح الآن
+          </label>
+        </div>
+
+        <label>موعد فتح التسجيل تلقائيًا (اختياري)</label>
+        <input type="datetime-local" id="regOpensAt">
+
+        <label>موعد إغلاق التسجيل تلقائيًا (اختياري)</label>
+        <input type="datetime-local" id="regClosesAt">
+
+        <label>رسالة الإغلاق المخصصة (اختياري)</label>
+        <textarea id="regClosedMessage" rows="3" placeholder="مثال: انتهى التسجيل لهذا العام، نشوفكم في صيف الابتكار القادم بإذن الله!"
+          style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+        <p style="font-size:12px;color:#6b7280;margin-top:4px;">اتركها فارغة لاستخدام الرسائل الافتراضية المناسبة لكل حالة (مغلق يدويًا / لم يبدأ بعد / انتهى الوقت).</p>
+
+        <button class="btn btn-navy" style="margin-top:12px;" onclick="saveRegistrationControl()">حفظ إعدادات التسجيل</button>
+        <div class="msg" id="regSettingsMsg" style="margin-top:10px;font-size:13px;"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -321,6 +349,11 @@ async function loadAll(){
   const { data: settings } = await supabaseClient.from('app_settings').select('*').eq('id', 1).single();
   minAttendanceDays = settings ? settings.min_attendance_days : 2;
   document.getElementById('minDaysInput').value = minAttendanceDays;
+
+  document.getElementById('regOpenToggle').checked = settings ? settings.registration_open !== false : true;
+  document.getElementById('regOpensAt').value = toDatetimeLocal(settings && settings.registration_opens_at);
+  document.getElementById('regClosesAt').value = toDatetimeLocal(settings && settings.registration_closes_at);
+  document.getElementById('regClosedMessage').value = (settings && settings.registration_closed_message) || '';
 
   await loadFacilitators();
   await loadAdmins();
@@ -755,6 +788,34 @@ async function saveSettings(){
   msg.style.color = '#1e7a3f';
   msg.textContent = 'تم الحفظ';
   renderStats();
+}
+
+// تحويل تاريخ ISO (من قاعدة البيانات) لصيغة datetime-local (بتوقيت الجهاز المحلي)
+function toDatetimeLocal(isoString){
+  if(!isoString) return '';
+  const d = new Date(isoString);
+  const offsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+async function saveRegistrationControl(){
+  const msg = document.getElementById('regSettingsMsg');
+  const isOpen = document.getElementById('regOpenToggle').checked;
+  const opensVal = document.getElementById('regOpensAt').value;
+  const closesVal = document.getElementById('regClosesAt').value;
+  const customMsg = document.getElementById('regClosedMessage').value.trim();
+
+  const payload = {
+    registration_open: isOpen,
+    registration_opens_at: opensVal ? new Date(opensVal).toISOString() : null,
+    registration_closes_at: closesVal ? new Date(closesVal).toISOString() : null,
+    registration_closed_message: customMsg || null,
+  };
+
+  const { error } = await supabaseClient.from('app_settings').update(payload).eq('id', 1);
+  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + error.message; return; }
+  msg.style.color = '#1e7a3f';
+  msg.textContent = 'تم حفظ إعدادات التسجيل';
 }
 
 // ---------- التحليلات ----------

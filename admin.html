@@ -75,6 +75,15 @@
   .activation-btn{border:1.5px solid #dcd3b8;background:#fff;color:#6b7280;border-radius:8px;
     padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;}
   .activation-btn.on{background:var(--gold);border-color:var(--gold);color:var(--navy);}
+  .trackreg-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f0ead4;flex-wrap:wrap;}
+  .trackreg-row:last-child{border-bottom:none;}
+  .trackreg-row .track-label{flex:1;min-width:150px;font-weight:600;font-size:13.5px;color:var(--navy);}
+  .trackreg-row .count-badge{font-size:12.5px;color:#6b7280;min-width:70px;}
+  .trackreg-row input[type=number]{width:70px;padding:6px 8px;border:1.5px solid #dcd3b8;border-radius:8px;font-family:inherit;font-size:13px;}
+  .toggle-btn{border:1.5px solid #dcd3b8;background:#fff;color:#6b7280;border-radius:8px;
+    padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .toggle-btn.open{background:#e8f6ec;border-color:#1e7a3f;color:#1e7a3f;}
+  .toggle-btn.closed{background:#fdecec;border-color:#c0392b;color:#c0392b;}
   .cert-pill{background:var(--gold);color:var(--navy);}
   .small-btn{border:none;border-radius:7px;padding:5px 9px;font-size:12px;cursor:pointer;font-family:inherit;margin-left:4px;}
   .table-wrap{overflow-x:auto;}
@@ -131,6 +140,14 @@
           الميسّر لا يقدر يسجّل حضور إلا لليوم المفعّل هنا. فعّل اليوم الصحيح قبل بداية كل جلسة.
         </p>
         <div id="dayActivationRows"></div>
+      </div>
+
+      <div class="card" id="trackRegControlCard">
+        <h3>التحكم بالتسجيل لكل مسار</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          حدّد السعة القصوى لكل مسار (يُغلق تلقائيًا عند الاكتمال)، أو أغلقه يدويًا بغض النظر عن السعة.
+        </p>
+        <div id="trackRegRows"></div>
       </div>
 
       <div class="toolbar">
@@ -296,6 +313,7 @@ let facilitators = [];
 let minAttendanceDays = 2;
 let evaluations = [];
 let evaluatedIds = new Set();
+let trackRegStatus = {};
 let editingId = null;
 let charts = {};
 
@@ -357,7 +375,9 @@ async function loadAll(){
 
   await loadFacilitators();
   await loadAdmins();
+  await loadTrackRegStatus();
   renderDayActivation();
+  renderTrackRegControl();
   renderStats();
   renderTable();
 }
@@ -451,6 +471,49 @@ async function setActiveDay(trackId, dayNum){
   participants.forEach(p => { if(p.track_id === trackId && p.tracks) p.tracks.active_day = newVal; });
   renderDayActivation();
   renderTable();
+}
+
+async function loadTrackRegStatus(){
+  const { data } = await supabaseClient.rpc('get_track_registration_status');
+  trackRegStatus = {};
+  (data || []).forEach(s => { trackRegStatus[s.track_id] = s; });
+}
+
+function renderTrackRegControl(){
+  document.getElementById('trackRegRows').innerHTML = tracks.map(t => {
+    const status = trackRegStatus[t.id] || {};
+    const count = status.registered_count ?? 0;
+    const capacity = t.capacity ?? '';
+    const isOpen = t.registration_open !== false;
+    return `
+    <div class="trackreg-row">
+      <div class="track-label">${t.name_ar}</div>
+      <span class="count-badge">${count} مسجَّل${capacity !== '' ? ' / ' + capacity : ''}</span>
+      <input type="number" min="0" placeholder="السعة" value="${capacity}" id="cap_${t.id}">
+      <button class="btn btn-outline" style="padding:6px 10px;font-size:12.5px;" onclick="saveTrackCapacity('${t.id}')">حفظ السعة</button>
+      <button class="toggle-btn ${isOpen ? 'open' : 'closed'}" onclick="toggleTrackReg('${t.id}')">${isOpen ? 'مفتوح' : 'مغلق'}</button>
+    </div>`;
+  }).join('');
+}
+
+async function saveTrackCapacity(trackId){
+  const input = document.getElementById(`cap_${trackId}`);
+  const val = input.value === '' ? null : parseInt(input.value, 10);
+  const { error } = await supabaseClient.from('tracks').update({ capacity: val }).eq('id', trackId);
+  if(error){ alert('تعذّر الحفظ: ' + error.message); return; }
+  const t = tracks.find(x => x.id === trackId);
+  t.capacity = val;
+  renderTrackRegControl();
+}
+
+async function toggleTrackReg(trackId){
+  const t = tracks.find(x => x.id === trackId);
+  const currentlyOpen = t.registration_open !== false;
+  const newVal = !currentlyOpen;
+  const { error } = await supabaseClient.from('tracks').update({ registration_open: newVal }).eq('id', trackId);
+  if(error){ alert('تعذّر التحديث: ' + error.message); return; }
+  t.registration_open = newVal;
+  renderTrackRegControl();
 }
 
 function dayCell(p, n){

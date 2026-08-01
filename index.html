@@ -49,6 +49,10 @@
   @media(max-width:520px){.tracks{grid-template-columns:1fr;}}
   .track-opt{position:relative;}
   .track-opt input{position:absolute;opacity:0;inset:0;cursor:pointer;width:100%;height:100%;}
+  .track-opt.disabled input{cursor:not-allowed;}
+  .track-opt.disabled .track-card{opacity:.5;background:#f1f1ec;cursor:not-allowed;}
+  .track-badge{display:inline-block;background:#9ca3af;color:#fff;font-size:10.5px;font-weight:700;
+    padding:1px 7px;border-radius:999px;margin-right:6px;vertical-align:middle;}
   .track-card{
     border:1.5px solid #dcd3b8;border-radius:12px;padding:12px 14px;background:#fffdf7;cursor:pointer;
   }
@@ -166,16 +170,34 @@ async function loadTracks(){
 
   const { data, error } = await supabaseClient.from('tracks').select('*').order('day1_date');
   tracksData = (data && data.length) ? data : FALLBACK_TRACKS;
+
+  const { data: statusData } = await supabaseClient.rpc('get_track_registration_status');
+  const statusMap = {};
+  (statusData || []).forEach(s => { statusMap[s.track_id] = s; });
+
   const grid = document.getElementById('tracksGrid');
-  grid.innerHTML = tracksData.map((t, i) => `
-    <label class="track-opt">
-      <input type="radio" name="track" value="${t.id || t.code}" ${i===0?'required':''}>
+  let firstEnabledUsed = false;
+
+  grid.innerHTML = tracksData.map((t) => {
+    const tid = t.id || t.code;
+    const status = statusMap[tid];
+    const isFull = status && status.capacity != null && status.registered_count >= status.capacity;
+    const isClosed = status && status.registration_open === false;
+    const unavailable = isFull || isClosed;
+    const isFirst = !unavailable && !firstEnabledUsed;
+    if(isFirst) firstEnabledUsed = true;
+
+    const badge = isClosed ? '<span class="track-badge">مغلق</span>' : (isFull ? '<span class="track-badge">مكتمل</span>' : '');
+
+    return `
+    <label class="track-opt ${unavailable ? 'disabled' : ''}">
+      <input type="radio" name="track" value="${tid}" ${isFirst ? 'required' : ''} ${unavailable ? 'disabled' : ''}>
       <div class="track-card">
-        <div class="track-name">${t.name_ar}</div>
+        <div class="track-name">${t.name_ar} ${badge}</div>
         ${t.day1_date ? `<div class="track-dates">${formatRange(t.day1_date, t.day3_date)}</div>` : ''}
       </div>
-    </label>
-  `).join('');
+    </label>`;
+  }).join('');
 }
 
 function formatRange(d1, d3){
@@ -195,6 +217,19 @@ document.getElementById('regForm').addEventListener('submit', async (e) => {
 
   const trackId = document.querySelector('input[name="track"]:checked')?.value;
   if(!trackId){ errMsg.textContent = 'الرجاء اختيار مسار'; errMsg.style.display='block'; return; }
+
+  // تحقق أخير احتياطي: هل المسار لسه متاح (لو امتلأ أو أُغلق لحظيًا بين تحميل الصفحة والإرسال)؟
+  const { data: freshStatus } = await supabaseClient.rpc('get_track_registration_status');
+  const trackStatus = (freshStatus || []).find(s => s.track_id === trackId);
+  if(trackStatus){
+    const stillOpen = trackStatus.registration_open !== false;
+    const stillHasRoom = trackStatus.capacity == null || trackStatus.registered_count < trackStatus.capacity;
+    if(!stillOpen || !stillHasRoom){
+      errMsg.textContent = 'عذرًا، هذا المسار امتلأ أو أُغلق للتو. الرجاء اختيار مسار آخر وتحديث الصفحة.';
+      errMsg.style.display = 'block';
+      return;
+    }
+  }
 
   const generatedToken = (crypto.randomUUID ? crypto.randomUUID().replace(/-/g,'') : String(Date.now()) + Math.random().toString(36).slice(2)).slice(0,16);
 

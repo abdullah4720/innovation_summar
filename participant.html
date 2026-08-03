@@ -39,6 +39,16 @@
   .hide{display:none !important;}
 
   .result-name{font-size:22px;font-weight:900;color:var(--navy);text-align:center;}
+
+  .progress-timeline{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;position:relative;}
+  .progress-timeline::before{content:"";position:absolute;top:11px;right:8%;left:8%;height:2px;background:#e5e1cc;z-index:0;}
+  .pt-step{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;flex:1;gap:6px;}
+  .pt-dot{width:24px;height:24px;border-radius:50%;background:#f1f1ec;border:2px solid #dcd3b8;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9ca3af;}
+  .pt-step.done .pt-dot{background:var(--gold);border-color:var(--gold);color:var(--navy);}
+  .pt-step.current .pt-dot{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .pt-label{font-size:11px;color:#6b7280;text-align:center;font-weight:600;}
+  .pt-step.done .pt-label, .pt-step.current .pt-label{color:var(--navy);}
   .result-track{text-align:center;color:#6b7280;font-size:14px;margin-top:2px;}
 
   .days{display:flex;gap:8px;margin-top:16px;}
@@ -112,6 +122,7 @@
   </div>
 
   <div class="card hide" id="resultCard">
+    <div class="progress-timeline" id="progressTimeline"></div>
     <div class="result-name" id="rName"></div>
     <div class="result-track" id="rTrack"></div>
 
@@ -157,6 +168,17 @@
 let myEmail = '', myPhone = '';
 let minAttendanceDays = 2;
 
+// تذكّر آخر بريد وجوال بحث فيهما المشارك، حتى ما يحتاج يكتبهم كل مرة
+(function prefillSaved(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('participant_lookup') || 'null');
+    if(saved){
+      document.getElementById('email').value = saved.email || '';
+      document.getElementById('phone').value = saved.phone || '';
+    }
+  } catch(_){}
+})();
+
 async function lookup(){
   const email = document.getElementById('email').value.trim();
   const phone = document.getElementById('phone').value.trim();
@@ -166,7 +188,7 @@ async function lookup(){
 
   if(!email || !phone){ errMsg.textContent = 'أدخل البريد ورقم الجوال المسجَّلين'; errMsg.style.display = 'block'; return; }
 
-  btn.disabled = true; btn.textContent = 'جاري البحث...';
+  btn.disabled = true; btn.textContent = '⏳ جاري البحث...';
 
   const [{ data, error }, { data: settings }] = await Promise.all([
     supabaseClient.rpc('get_my_status', { p_email: email, p_phone: phone }),
@@ -183,6 +205,7 @@ async function lookup(){
   }
 
   myEmail = email; myPhone = phone;
+  try{ localStorage.setItem('participant_lookup', JSON.stringify({ email, phone })); } catch(_){}
   renderResult(data[0]);
 }
 
@@ -202,11 +225,41 @@ function getRating(containerId){
   return checked ? parseInt(checked.value, 10) : null;
 }
 
+function renderProgressTimeline(state){
+  const steps = [
+    { key: 'registered', label: 'التسجيل', icon: '1' },
+    { key: 'attendance', label: 'الحضور', icon: '2' },
+    { key: 'evaluation', label: 'التقييم', icon: '3' },
+    { key: 'certificate', label: 'الشهادة', icon: '4' },
+  ];
+  // نحدد أول خطوة لم تكتمل بعد لتمييزها كـ"الحالية"
+  let currentFound = false;
+  document.getElementById('progressTimeline').innerHTML = steps.map(s => {
+    const done = state[s.key];
+    const isCurrent = !done && !currentFound;
+    if(isCurrent) currentFound = true;
+    const cls = done ? 'done' : (isCurrent ? 'current' : '');
+    return `<div class="pt-step ${cls}">
+      <div class="pt-dot">${done ? '✓' : s.icon}</div>
+      <div class="pt-label">${s.label}</div>
+    </div>`;
+  }).join('');
+}
+
 function renderResult(r){
   document.getElementById('lookupCard').classList.add('hide');
   document.getElementById('resultCard').classList.remove('hide');
   document.getElementById('rName').textContent = r.full_name;
   document.getElementById('rTrack').textContent = r.track_name;
+
+  const attendedDaysCount = [r.day1_attended, r.day2_attended, r.day3_attended].filter(v => v === true).length;
+  const attendanceDone = attendedDaysCount >= minAttendanceDays;
+  renderProgressTimeline({
+    registered: true,
+    attendance: attendanceDone,
+    evaluation: !!r.evaluation_submitted,
+    certificate: !!r.certificate_issued,
+  });
 
   const days = [
     { label: 'اليوم الأول', date: r.day1_date, val: r.day1_attended },
@@ -294,6 +347,7 @@ async function submitEvaluationInline(){
   }
 
   document.getElementById('evalCard').classList.add('hide');
+  renderProgressTimeline({ registered: true, attendance: true, evaluation: true, certificate: false });
   await requestCertificate();
 }
 
@@ -307,6 +361,7 @@ async function requestCertificate(){
     return;
   }
 
+  renderProgressTimeline({ registered: true, attendance: true, evaluation: true, certificate: true });
   certBox.innerHTML = `
     <div class="cert-box ready">
       🎉 مبروك! شهادتك جاهزة

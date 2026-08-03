@@ -101,6 +101,16 @@
   .modal .actions button{flex:1;}
   .settings-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .settings-row input{width:90px;}
+
+  .toast-container{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;
+    display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;}
+  .toast{background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;
+    box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:opacity .25s, transform .25s;
+    max-width:90vw;text-align:center;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.error{background:#c0392b;}
+  .toast.success{background:#1e7a3f;}
+  .toast.info{background:var(--navy);}
 </style>
 </head>
 <body>
@@ -321,7 +331,7 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
   if(session){
     const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
     if(!profile || profile.role !== 'admin'){
-      alert('هذا الحساب ليس حساب مدير. استخدم صفحة الميسّر إذا كنت مسندًا لمسار معيّن.');
+      showToast('هذا الحساب ليس حساب مدير. استخدم صفحة الميسّر إذا كنت مسندًا لمسار معيّن.', 'error');
       await supabaseClient.auth.signOut();
       return;
     }
@@ -349,6 +359,8 @@ function switchTab(name){
 }
 
 async function loadAll(){
+  document.getElementById('statsRow').innerHTML = '<div class="stat"><div class="lbl" style="padding:10px 0;">⏳ جاري تحميل البيانات...</div></div>';
+
   const { data: t } = await supabaseClient.from('tracks').select('*').order('day1_date');
   tracks = t || [];
 
@@ -356,6 +368,11 @@ async function loadAll(){
   sel.innerHTML = '<option value="">كل المسارات</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('editTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('facTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
+
+  // استرجاع الفلاتر المحفوظة بالرابط (لو موجودة) عند أول تحميل فقط
+  const urlParams = new URLSearchParams(window.location.search);
+  if(urlParams.get('q')) document.getElementById('search').value = urlParams.get('q');
+  if(urlParams.get('track')) sel.value = urlParams.get('track');
 
   const { data: p } = await supabaseClient.from('participants').select('*, tracks(*)').order('full_name', {ascending:true});
   participants = p || [];
@@ -420,6 +437,13 @@ function renderTable(){
   const q = document.getElementById('search').value.trim().toLowerCase();
   const trackId = document.getElementById('trackFilter').value;
 
+  // نحفظ الفلاتر في الرابط عشان ما تضيع لو تحدّثت الصفحة أو انرسل الرابط لشخص ثاني
+  const params = new URLSearchParams(window.location.search);
+  q ? params.set('q', q) : params.delete('q');
+  trackId ? params.set('track', trackId) : params.delete('track');
+  const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  window.history.replaceState({}, '', newUrl);
+
   const filtered = participants.filter(p => {
     const matchesQ = !q || p.full_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
     const matchesTrack = !trackId || p.track_id === trackId;
@@ -466,7 +490,7 @@ async function setActiveDay(trackId, dayNum){
   const track = tracks.find(t => t.id === trackId);
   const newVal = (track.active_day === dayNum) ? null : dayNum;
   const { error } = await supabaseClient.from('tracks').update({ active_day: newVal }).eq('id', trackId);
-  if(error){ alert('تعذّر التحديث: ' + error.message); return; }
+  if(error){ showToast('تعذّر التحديث: ' + error.message, 'error'); return; }
   track.active_day = newVal;
   participants.forEach(p => { if(p.track_id === trackId && p.tracks) p.tracks.active_day = newVal; });
   renderDayActivation();
@@ -500,10 +524,11 @@ async function saveTrackCapacity(trackId){
   const input = document.getElementById(`cap_${trackId}`);
   const val = input.value === '' ? null : parseInt(input.value, 10);
   const { error } = await supabaseClient.from('tracks').update({ capacity: val }).eq('id', trackId);
-  if(error){ alert('تعذّر الحفظ: ' + error.message); return; }
+  if(error){ showToast('تعذّر الحفظ: ' + error.message, 'error'); return; }
   const t = tracks.find(x => x.id === trackId);
   t.capacity = val;
   renderTrackRegControl();
+  showToast('تم حفظ السعة', 'success');
 }
 
 async function toggleTrackReg(trackId){
@@ -511,9 +536,10 @@ async function toggleTrackReg(trackId){
   const currentlyOpen = t.registration_open !== false;
   const newVal = !currentlyOpen;
   const { error } = await supabaseClient.from('tracks').update({ registration_open: newVal }).eq('id', trackId);
-  if(error){ alert('تعذّر التحديث: ' + error.message); return; }
+  if(error){ showToast('تعذّر التحديث: ' + error.message, 'error'); return; }
   t.registration_open = newVal;
   renderTrackRegControl();
+  showToast(newVal ? 'تم فتح التسجيل للمسار' : 'تم إغلاق التسجيل للمسار', 'success');
 }
 
 function dayCell(p, n){
@@ -538,11 +564,11 @@ function genCertCode(){ return 'INV-2026-' + Math.random().toString(36).slice(2,
 async function issueCertificate(id){
   const p = participants.find(x => x.id === id);
   if(attendedCount(p) < minAttendanceDays){
-    alert(`لا يمكن إصدار الشهادة: ${p.full_name} لم يستوفِ الحد الأدنى للحضور (${minAttendanceDays} من 3 أيام) — الحضور الحالي: ${attendedCount(p)}`);
+    showToast(`لا يمكن إصدار الشهادة: ${p.full_name} لم يستوفِ الحد الأدنى للحضور (${minAttendanceDays} من 3 أيام)`, 'error');
     return;
   }
   if(!hasEvaluation(p)){
-    alert(`لا يمكن إصدار الشهادة: ${p.full_name} لم يُكمل استبيان التقييم الإلزامي بعد.`);
+    showToast(`لا يمكن إصدار الشهادة: ${p.full_name} لم يُكمل استبيان التقييم الإلزامي بعد.`, 'error');
     return;
   }
   const code = genCertCode();
@@ -552,7 +578,7 @@ async function issueCertificate(id){
 
 async function issueSelectedCertificates(){
   const eligible = participants.filter(p => isEligibleForCertificate(p) && !p.certificate_issued);
-  if(!eligible.length){ alert(`لا يوجد مشاركون مؤهّلون حاليًا (الحد الأدنى: ${minAttendanceDays} من 3 أيام + إكمال الاستبيان)`); return; }
+  if(!eligible.length){ showToast(`لا يوجد مشاركون مؤهّلون حاليًا (الحد الأدنى: ${minAttendanceDays} من 3 أيام + إكمال الاستبيان)`, 'info'); return; }
   if(!confirm(`سيتم إصدار ${eligible.length} شهادة (حضور ${minAttendanceDays} من 3 أيام + استبيان مكتمل). متابعة؟`)) return;
 
   for(const p of eligible){
@@ -594,13 +620,20 @@ async function saveEdit(){
   }
   closeEditModal();
   loadAll();
+  showToast('تم حفظ التعديلات بنجاح', 'success');
 }
 
 async function deleteParticipant(id){
   const p = participants.find(x => x.id === id);
   if(!confirm(`حذف تسجيل "${p.full_name}"؟ لا يمكن التراجع.`)) return;
   const { error } = await supabaseClient.from('participants').delete().eq('id', id);
-  if(!error){ participants = participants.filter(x => x.id !== id); renderStats(); renderTable(); }
+  if(!error){
+    participants = participants.filter(x => x.id !== id);
+    renderStats(); renderTable();
+    showToast('تم حذف المشارك', 'success');
+  } else {
+    showToast('تعذّر الحذف: ' + error.message, 'error');
+  }
 }
 
 // ---------- Excel ----------
@@ -613,7 +646,7 @@ async function printQRCodes(){
     return matchesQ && matchesTrack;
   });
 
-  if(!list.length){ alert('لا يوجد مشاركون مطابقون للعرض الحالي'); return; }
+  if(!list.length){ showToast('لا يوجد مشاركون مطابقون للعرض الحالي', 'info'); return; }
   if(!confirm(`سيتم توليد ${list.length} رمز QR للطباعة. متابعة؟`)) return;
 
   const cards = [];
@@ -706,7 +739,7 @@ async function importExcel(e){
   let msg = `تم استيراد ${success} مشارك`;
   if(dup) msg += ` — تخطّي ${dup} مكرر (بريد/جوال)`;
   if(failed) msg += ` — تعذّر استيراد ${failed}${failedNames.length ? ' (' + failedNames.slice(0,5).join('، ') + ')' : ''}`;
-  alert(msg);
+  showToast(msg, 'success');
   e.target.value = '';
   loadAll();
 }
@@ -942,6 +975,21 @@ function renderCharts(){
     options: { plugins:{legend:{position:'bottom', labels:{font:{size:11}}}} }
   });
 }
+
+function showToast(message, type = 'info'){
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
 </script>
+
+<div id="toastContainer" class="toast-container"></div>
 </body>
 </html>

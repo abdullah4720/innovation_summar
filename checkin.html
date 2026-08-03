@@ -9,7 +9,21 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-  :root{--navy:#0B1B3F;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;}
+  :root{--navy:#0B1B3F;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;
+    --surface:#fff;--text:#1c2230;--table-head:#0B1B3F;}
+  body.dark{--cream:#161b2b;--surface:#1f2438;--text:#e8e6df;--line:#2e3450;--table-head:#12172a;}
+  body.dark{background:var(--cream);color:var(--text);}
+  body.dark .card, body.dark table, body.dark .loginCard{background:var(--surface);border-color:var(--line);color:var(--text);}
+  body.dark th{background:var(--table-head);}
+  body.dark input, body.dark select{background:var(--surface);color:var(--text);border-color:var(--line);}
+  .theme-toggle{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;
+    padding:6px 10px;cursor:pointer;font-size:15px;}
+
+  @media(max-width:640px){
+    button{min-height:40px;}
+    input, select{min-height:44px;font-size:16px;}
+    th, td{padding:11px 8px;font-size:13px;}
+  }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--cream);color:var(--ink);font-family:'IBM Plex Sans Arabic',sans-serif;}
   h1,h2,.display{font-family:'Tajawal',sans-serif;}
@@ -46,7 +60,10 @@
 <body>
 <div class="topbar">
   <h1>تسجيل الحضور — صيف الابتكار</h1>
-  <span id="whoami" dir="ltr" style="font-size:13px;opacity:.85;"></span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">🌙</button>
+    <span id="whoami" dir="ltr" style="font-size:13px;opacity:.85;"></span>
+  </div>
 </div>
 
 <main>
@@ -89,6 +106,19 @@
 
 <script src="config.js"></script>
 <script>
+(function initTheme(){
+  if(localStorage.getItem('site_theme') === 'dark'){
+    document.body.classList.add('dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  }
+})();
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  localStorage.setItem('site_theme', isDark ? 'dark' : 'light');
+  document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+}
+
 let currentParticipant = null;
 let currentTrack = null;
 let html5QrCode = null;

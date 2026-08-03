@@ -11,7 +11,24 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
-  :root{--navy:#0B1B3F;--navy-2:#132a5c;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;}
+  :root{--navy:#0B1B3F;--navy-2:#132a5c;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;
+    --surface:#fff;--text:#1c2230;--text-muted:#6b7280;--table-head:#0B1B3F;--row-hover:#fffdf3;}
+  body.dark{--cream:#161b2b;--surface:#1f2438;--text:#e8e6df;--text-muted:#9aa0b4;
+    --line:#2e3450;--navy-2:#3a4a7a;--table-head:#12172a;--row-hover:#252a42;}
+  body.dark{background:var(--cream);color:var(--text);}
+  body.dark .card, body.dark table, body.dark .loginCard, body.dark .modal{background:var(--surface);border-color:var(--line);color:var(--text);}
+  body.dark th{background:var(--table-head);}
+  body.dark tr:hover td{background:var(--row-hover);}
+  body.dark input, body.dark select, body.dark textarea{background:var(--surface);color:var(--text);border-color:var(--line);}
+  body.dark .stat{background:var(--surface);border-color:var(--line);}
+  body.dark .btn-outline{background:var(--surface);color:var(--gold);border-color:var(--gold);}
+  body.dark .toolbar select, body.dark .toolbar input{background:var(--surface);color:var(--text);}
+  .theme-toggle{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;
+    padding:6px 10px;cursor:pointer;font-size:15px;}
+
+  .bulk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff9e6;border:1.5px solid var(--gold);
+    border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;font-weight:600;color:var(--navy);}
+  body.dark .bulk-bar{background:#2a2510;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--cream);color:var(--ink);font-family:'IBM Plex Sans Arabic',sans-serif;}
   h1,h2,h3,.display{font-family:'Tajawal',sans-serif;}
@@ -91,6 +108,16 @@
   .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:760px){.charts-grid{grid-template-columns:1fr;}}
 
+  @media(max-width:640px){
+    .btn, .small-btn, .activation-btn, .toggle-btn, button{min-height:38px;}
+    .small-btn{padding:8px 12px;font-size:13px;}
+    input, select, textarea{min-height:42px;font-size:16px;} /* 16px يمنع التكبير التلقائي بـ iOS */
+    th, td{padding:12px 10px;font-size:13px;}
+    .toolbar{gap:8px;}
+    .toolbar input, .toolbar select, .toolbar button{width:100%;}
+    input[type=checkbox]{width:20px;height:20px;}
+  }
+
   /* Modal */
   .modal-bg{position:fixed;inset:0;background:rgba(11,27,63,.45);display:flex;align-items:center;justify-content:center;z-index:50;}
   .modal{background:#fff;border-radius:16px;padding:24px;max-width:420px;width:92%;}
@@ -127,6 +154,7 @@
   <div class="topbar">
     <h1>لوحة تحكم صيف الابتكار 2026</h1>
     <div class="right">
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="الوضع الليلي">🌙</button>
       <span id="whoami" dir="ltr"></span>
       <button onclick="logout()">تسجيل الخروج</button>
     </div>
@@ -161,7 +189,7 @@
       </div>
 
       <div class="toolbar">
-        <input type="search" id="search" placeholder="بحث بالاسم أو البريد..." oninput="renderTable()">
+        <input type="search" id="search" placeholder="بحث بالاسم أو البريد... (Ctrl+K)" oninput="renderTable()">
         <select id="trackFilter" onchange="renderTable()"><option value="">كل المسارات</option></select>
         <button class="btn btn-outline" onclick="document.getElementById('fileImport').click()">استيراد Excel</button>
         <input type="file" id="fileImport" accept=".xlsx,.xls,.csv" onchange="importExcel(event)">
@@ -170,10 +198,19 @@
         <button class="btn btn-gold" onclick="issueSelectedCertificates()">إصدار شهادات للمؤهّلين</button>
       </div>
 
+      <div class="bulk-bar hide" id="bulkBar">
+        <span id="bulkCount">0 محدد</span>
+        <button class="btn btn-gold" style="padding:6px 12px;font-size:13px;" onclick="bulkIssueCertificates()">إصدار شهادات للمحددين المؤهّلين</button>
+        <button class="btn btn-outline" style="padding:6px 12px;font-size:13px;" onclick="bulkExportSelected()">تصدير المحددين</button>
+        <button class="btn btn-danger" style="padding:6px 12px;font-size:13px;" onclick="bulkDeleteSelected()">حذف المحددين</button>
+        <button class="btn btn-outline" style="padding:6px 12px;font-size:13px;" onclick="clearSelection()">إلغاء التحديد</button>
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
+              <th><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)"></th>
               <th>#</th><th>الاسم</th><th>البريد</th><th>الجوال</th><th>المسار</th>
               <th>1</th><th>2</th><th>3</th><th>الشهادة</th><th>إجراءات</th>
             </tr>
@@ -324,6 +361,36 @@ let minAttendanceDays = 2;
 let evaluations = [];
 let evaluatedIds = new Set();
 let trackRegStatus = {};
+let selectedIds = new Set();
+
+// ---------- الوضع الليلي ----------
+(function initTheme(){
+  const saved = localStorage.getItem('admin_theme');
+  if(saved === 'dark'){
+    document.body.classList.add('dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  }
+})();
+
+function toggleTheme(){
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  localStorage.setItem('admin_theme', isDark ? 'dark' : 'light');
+  document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+}
+
+// ---------- اختصارات لوحة المفاتيح ----------
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape'){
+    if(!document.getElementById('editModalBg').classList.contains('hide')) closeEditModal();
+  }
+  // Ctrl/Cmd + K يركّز على مربع البحث بسرعة
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){
+    e.preventDefault();
+    const search = document.getElementById('search');
+    if(search){ search.focus(); search.select(); }
+  }
+});
 let editingId = null;
 let charts = {};
 
@@ -452,6 +519,7 @@ function renderTable(){
 
   document.getElementById('tbody').innerHTML = filtered.map((p, i) => `
     <tr>
+      <td><input type="checkbox" class="row-check" data-id="${p.id}" ${selectedIds.has(p.id)?'checked':''} onchange="toggleSelect('${p.id}', this.checked)"></td>
       <td>${i + 1}</td>
       <td>${p.full_name}</td>
       <td dir="ltr" style="text-align:right;">${p.email}</td>
@@ -471,7 +539,76 @@ function renderTable(){
         <button class="small-btn btn-danger" onclick="deleteParticipant('${p.id}')">حذف</button>
       </td>
     </tr>
-  `).join('') || '<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:20px;">لا توجد نتائج</td></tr>';
+  `).join('') || '<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:20px;">لا توجد نتائج</td></tr>';
+
+  renderBulkBar();
+}
+
+// ---------- التحديد والإجراءات الجماعية ----------
+function toggleSelect(id, checked){
+  checked ? selectedIds.add(id) : selectedIds.delete(id);
+  renderBulkBar();
+}
+
+function toggleSelectAll(checked){
+  document.querySelectorAll('.row-check').forEach(cb => {
+    cb.checked = checked;
+    checked ? selectedIds.add(cb.dataset.id) : selectedIds.delete(cb.dataset.id);
+  });
+  renderBulkBar();
+}
+
+function clearSelection(){
+  selectedIds.clear();
+  document.getElementById('selectAllCheckbox').checked = false;
+  renderTable();
+}
+
+function renderBulkBar(){
+  const bar = document.getElementById('bulkBar');
+  const count = selectedIds.size;
+  document.getElementById('bulkCount').textContent = `${count} محدد`;
+  bar.classList.toggle('hide', count === 0);
+}
+
+function getSelectedParticipants(){
+  return participants.filter(p => selectedIds.has(p.id));
+}
+
+async function bulkDeleteSelected(){
+  const list = getSelectedParticipants();
+  if(!list.length) return;
+  if(!confirm(`حذف ${list.length} مشارك محدد؟ لا يمكن التراجع.`)) return;
+
+  const ids = list.map(p => p.id);
+  const { error } = await supabaseClient.from('participants').delete().in('id', ids);
+  if(error){ showToast('تعذّر الحذف: ' + friendlyError(error), 'error'); return; }
+
+  participants = participants.filter(p => !selectedIds.has(p.id));
+  selectedIds.clear();
+  renderStats(); renderTable();
+  showToast(`تم حذف ${ids.length} مشارك`, 'success');
+}
+
+function bulkExportSelected(){
+  const list = getSelectedParticipants();
+  if(!list.length) return;
+  exportParticipantsList(list, `مشاركون_محددون_${list.length}`);
+  showToast(`تم تصدير ${list.length} مشارك`, 'success');
+}
+
+async function bulkIssueCertificates(){
+  const list = getSelectedParticipants().filter(p => isEligibleForCertificate(p) && !p.certificate_issued);
+  if(!list.length){ showToast('لا يوجد بين المحددين أحد مؤهّل حاليًا لإصدار الشهادة', 'info'); return; }
+  if(!confirm(`سيتم إصدار ${list.length} شهادة للمحددين المؤهّلين. متابعة؟`)) return;
+
+  for(const p of list){
+    const code = genCertCode();
+    await supabaseClient.from('participants').update({ certificate_issued: true, certificate_code: code }).eq('id', p.id);
+    p.certificate_issued = true; p.certificate_code = code;
+  }
+  renderStats(); renderTable();
+  showToast(`تم إصدار ${list.length} شهادة`, 'success');
 }
 
 function renderDayActivation(){
@@ -490,7 +627,7 @@ async function setActiveDay(trackId, dayNum){
   const track = tracks.find(t => t.id === trackId);
   const newVal = (track.active_day === dayNum) ? null : dayNum;
   const { error } = await supabaseClient.from('tracks').update({ active_day: newVal }).eq('id', trackId);
-  if(error){ showToast('تعذّر التحديث: ' + error.message, 'error'); return; }
+  if(error){ showToast('تعذّر التحديث: ' + friendlyError(error), 'error'); return; }
   track.active_day = newVal;
   participants.forEach(p => { if(p.track_id === trackId && p.tracks) p.tracks.active_day = newVal; });
   renderDayActivation();
@@ -524,7 +661,7 @@ async function saveTrackCapacity(trackId){
   const input = document.getElementById(`cap_${trackId}`);
   const val = input.value === '' ? null : parseInt(input.value, 10);
   const { error } = await supabaseClient.from('tracks').update({ capacity: val }).eq('id', trackId);
-  if(error){ showToast('تعذّر الحفظ: ' + error.message, 'error'); return; }
+  if(error){ showToast('تعذّر الحفظ: ' + friendlyError(error), 'error'); return; }
   const t = tracks.find(x => x.id === trackId);
   t.capacity = val;
   renderTrackRegControl();
@@ -536,7 +673,7 @@ async function toggleTrackReg(trackId){
   const currentlyOpen = t.registration_open !== false;
   const newVal = !currentlyOpen;
   const { error } = await supabaseClient.from('tracks').update({ registration_open: newVal }).eq('id', trackId);
-  if(error){ showToast('تعذّر التحديث: ' + error.message, 'error'); return; }
+  if(error){ showToast('تعذّر التحديث: ' + friendlyError(error), 'error'); return; }
   t.registration_open = newVal;
   renderTrackRegControl();
   showToast(newVal ? 'تم فتح التسجيل للمسار' : 'تم إغلاق التسجيل للمسار', 'success');
@@ -615,7 +752,7 @@ async function saveEdit(){
   const msg = document.getElementById('editMsg');
   if(error){
     msg.style.color = '#9c2b2b';
-    msg.textContent = error.code === '23505' ? 'البريد أو الجوال مستخدم من مشارك آخر' : 'تعذّر الحفظ: ' + error.message;
+    msg.textContent = 'تعذّر الحفظ: ' + friendlyError(error);
     return;
   }
   closeEditModal();
@@ -632,7 +769,7 @@ async function deleteParticipant(id){
     renderStats(); renderTable();
     showToast('تم حذف المشارك', 'success');
   } else {
-    showToast('تعذّر الحذف: ' + error.message, 'error');
+    showToast('تعذّر الحذف: ' + friendlyError(error), 'error');
   }
 }
 
@@ -683,7 +820,11 @@ async function printQRCodes(){
 }
 
 function exportExcel(){
-  const rows = participants.map(p => ({
+  exportParticipantsList(participants, 'صيف_الابتكار_2026');
+}
+
+function exportParticipantsList(list, filename){
+  const rows = list.map(p => ({
     'الاسم': p.full_name, 'البريد': p.email, 'الجوال': p.phone, 'الجهة': p.organization || '',
     'المسار': p.tracks ? p.tracks.name_ar : '', 'اليوم 1': p.day1_attended ? 'حضر' : '',
     'اليوم 2': p.day2_attended ? 'حضر' : '', 'اليوم 3': p.day3_attended ? 'حضر' : '',
@@ -693,7 +834,7 @@ function exportExcel(){
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'المشاركون');
-  XLSX.writeFile(wb, 'صيف_الابتكار_2026.xlsx');
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
 async function importExcel(e){
@@ -879,7 +1020,7 @@ async function saveSettings(){
   const val = parseInt(document.getElementById('minDaysInput').value, 10);
   const msg = document.getElementById('settingsMsg');
   const { error } = await supabaseClient.from('app_settings').update({ min_attendance_days: val }).eq('id', 1);
-  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + error.message; return; }
+  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + friendlyError(error); return; }
   minAttendanceDays = val;
   msg.style.color = '#1e7a3f';
   msg.textContent = 'تم الحفظ';
@@ -909,7 +1050,7 @@ async function saveRegistrationControl(){
   };
 
   const { error } = await supabaseClient.from('app_settings').update(payload).eq('id', 1);
-  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + error.message; return; }
+  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + friendlyError(error); return; }
   msg.style.color = '#1e7a3f';
   msg.textContent = 'تم حفظ إعدادات التسجيل';
 }
@@ -974,6 +1115,19 @@ function renderCharts(){
     data: { labels: topOrgs.map(o=>o[0]), datasets: [{ data: topOrgs.map(o=>o[1]), backgroundColor: ['#0B1B3F','#E7B10A','#5b6b98','#f0cf6b','#8a99c4','#c9a544'] } ] },
     options: { plugins:{legend:{position:'bottom', labels:{font:{size:11}}}} }
   });
+}
+
+function friendlyError(error){
+  if(!error) return 'حدث خطأ غير متوقع';
+  const code = error.code;
+  const msg = error.message || '';
+
+  if(code === '23505') return 'هذا البريد أو رقم الجوال مستخدم مسبقًا لمشارك آخر';
+  if(code === '23503') return 'تعذّر تنفيذ العملية بسبب ارتباط هذا السجل ببيانات أخرى';
+  if(code === '23514') return 'قيمة غير صالحة، تحقق من البيانات المدخلة';
+  if(msg.includes('JWT') || msg.includes('token')) return 'انتهت صلاحية الجلسة، الرجاء تسجيل الدخول من جديد';
+  if(msg.includes('network') || msg.includes('fetch')) return 'تعذّر الاتصال بالخادم، تحقق من الإنترنت وحاول مرة أخرى';
+  return msg || 'حدث خطأ غير متوقع، حاول مرة أخرى';
 }
 
 function showToast(message, type = 'info'){

@@ -170,7 +170,7 @@ async function downloadPdf(){
   clone.style.top = '0';
   clone.style.left = '-99999px';
   clone.style.margin = '0';
-  clone.style.width = original.offsetWidth + 'px';
+  clone.style.width = '800px';
   clone.style.height = 'auto';
   clone.style.transform = 'none';
   document.body.appendChild(clone);
@@ -203,11 +203,11 @@ async function downloadPdf(){
   const pageWmm = cloneW * pxToMm;
   const pageHmm = cloneH * pxToMm;
 
-  const pdf = new jsPDF({
-    orientation: pageWmm >= pageHmm ? 'l' : 'p',
-    unit: 'mm',
-    format: [pageWmm, pageHmm],
-  });
+  const pdf = new jsPDF({ unit: 'mm' });
+  // نحدد أبعاد الصفحة مباشرة بعد الإنشاء لتفادي أي تحويل تلقائي غير مرغوب
+  // يحصل داخل مُنشئ jsPDF عند الجمع بين orientation ومقاس مخصّص
+  pdf.internal.pageSize.setWidth(pageWmm);
+  pdf.internal.pageSize.setHeight(pageHmm);
   pdf.addImage(img, 'PNG', 0, 0, pageWmm, pageHmm, undefined, 'FAST');
   pdf.save('شهادة-صيف-الابتكار.pdf');
 }

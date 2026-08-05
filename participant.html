@@ -103,6 +103,15 @@
   .eval-submit:disabled{opacity:.6;cursor:not-allowed;}
 
   .back-link{display:block;text-align:center;margin-top:6px;color:#6b7280;font-size:13px;cursor:pointer;}
+
+  .ptabs{display:flex;gap:4px;margin:18px 0 16px;border-bottom:1.5px solid #e7ddc0;}
+  .ptab{position:relative;padding:9px 14px;cursor:pointer;font-size:13.5px;font-weight:700;color:#6b7280;
+    border-bottom:3px solid transparent;display:flex;align-items:center;gap:6px;}
+  .ptab.active{color:var(--navy);border-color:var(--gold);}
+  .ptab-badge{background:var(--gold);color:var(--navy);font-size:10px;font-weight:800;border-radius:999px;
+    padding:1px 6px;min-width:16px;text-align:center;display:inline-block;}
+  .ptab-content{animation:fadeIn .2s ease;}
+  @keyframes fadeIn{from{opacity:0;} to{opacity:1;}}
 </style>
 </head>
 <body>
@@ -128,46 +137,61 @@
 
   <div class="card hide" id="resultCard">
     <div class="progress-timeline" id="progressTimeline"></div>
-    <div id="announcementsBox"></div>
-    <div id="materialsBox"></div>
     <div class="result-name" id="rName"></div>
     <div class="result-track" id="rTrack"></div>
 
-    <div class="days" id="rDays"></div>
+    <div class="ptabs" id="ptabs">
+      <div class="ptab active" data-ptab="overview" onclick="switchPTab('overview')">نظرة عامة</div>
+      <div class="ptab" data-ptab="updates" onclick="switchPTab('updates')">التحديثات <span class="ptab-badge hide" id="updatesBadge"></span></div>
+      <div class="ptab" data-ptab="files" onclick="switchPTab('files')">المرفقات <span class="ptab-badge hide" id="filesBadge"></span></div>
+    </div>
 
-    <div class="hours-card" id="hoursCard">
-      <h3>ساعات التدريب المسجّلة</h3>
-      <div class="hint">3 أيام تدريبية × 4 ساعات يوميًا = 12 ساعة تدريبية كحد أقصى، تُحتسب تلقائيًا حسب حضورك الفعلي</div>
-      <div id="hourRows"></div>
-      <div class="hours-total">
-        <div class="total-line"><span>إجمالي الساعات</span><span id="totalHoursText"></span></div>
-        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="ptab-content" id="ptab-overview">
+      <div class="days" id="rDays"></div>
+
+      <div class="hours-card" id="hoursCard">
+        <h3>ساعات التدريب المسجّلة</h3>
+        <div class="hint">3 أيام تدريبية × 4 ساعات يوميًا = 12 ساعة تدريبية كحد أقصى، تُحتسب تلقائيًا حسب حضورك الفعلي</div>
+        <div id="hourRows"></div>
+        <div class="hours-total">
+          <div class="total-line"><span>إجمالي الساعات</span><span id="totalHoursText"></span></div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+      </div>
+
+      <div id="certBox"></div>
+
+      <div class="eval-card hide" id="evalCard">
+        <h3>استبيان تقييم التدريب</h3>
+        <div class="hint">خطوة أخيرة إلزامية بعد إتمام حضورك، وبعدها تصدر شهادتك مباشرة.</div>
+
+        <label>تقييمك لمحتوى التدريب</label>
+        <div class="stars" id="s1"></div>
+        <label>تقييمك للمدرب/الميسّر</label>
+        <div class="stars" id="s2"></div>
+        <label>تقييمك للتنظيم والمرافق</label>
+        <div class="stars" id="s3"></div>
+        <label>تقييمك العام للتجربة</label>
+        <div class="stars" id="s4"></div>
+        <label>ملاحظات أو مقترحات (اختياري)</label>
+        <textarea id="evalComment" placeholder="شاركنا رأيك بحرية..."></textarea>
+
+        <div class="msg error" id="evalErr" style="display:none;"></div>
+        <button class="eval-submit" id="evalSubmitBtn" onclick="submitEvaluationInline()">إرسال التقييم وإصدار الشهادة</button>
       </div>
     </div>
 
-    <div id="certBox"></div>
+    <div class="ptab-content hide" id="ptab-updates">
+      <div id="announcementsBox"></div>
+    </div>
 
-    <div class="eval-card hide" id="evalCard">
-      <h3>استبيان تقييم التدريب</h3>
-      <div class="hint">خطوة أخيرة إلزامية بعد إتمام حضورك، وبعدها تصدر شهادتك مباشرة.</div>
-
-      <label>تقييمك لمحتوى التدريب</label>
-      <div class="stars" id="s1"></div>
-      <label>تقييمك للمدرب/الميسّر</label>
-      <div class="stars" id="s2"></div>
-      <label>تقييمك للتنظيم والمرافق</label>
-      <div class="stars" id="s3"></div>
-      <label>تقييمك العام للتجربة</label>
-      <div class="stars" id="s4"></div>
-      <label>ملاحظات أو مقترحات (اختياري)</label>
-      <textarea id="evalComment" placeholder="شاركنا رأيك بحرية..."></textarea>
-
-      <div class="msg error" id="evalErr" style="display:none;"></div>
-      <button class="eval-submit" id="evalSubmitBtn" onclick="submitEvaluationInline()">إرسال التقييم وإصدار الشهادة</button>
+    <div class="ptab-content hide" id="ptab-files">
+      <div id="materialsBox"></div>
     </div>
 
     <span class="back-link" onclick="goBack()">‹ رجوع للبحث مرة أخرى</span>
   </div>
+
 </main>
 
 <script src="config.js"></script>
@@ -214,15 +238,31 @@ async function lookup(){
   myEmail = email; myPhone = phone;
   try{ localStorage.setItem('participant_lookup', JSON.stringify({ email, phone })); } catch(_){}
   renderResult(data[0]);
+  switchPTab('overview');
   loadAnnouncements();
   loadMaterials();
+}
+
+function switchPTab(name){
+  document.querySelectorAll('.ptab').forEach(t => t.classList.toggle('active', t.dataset.ptab === name));
+  ['overview','updates','files'].forEach(t => {
+    document.getElementById('ptab-' + t).classList.toggle('hide', t !== name);
+  });
 }
 
 async function loadAnnouncements(){
   const { data } = await supabaseClient.rpc('get_my_announcements', { p_email: myEmail, p_phone: myPhone });
   const box = document.getElementById('announcementsBox');
-  if(!data || !data.length){ box.innerHTML = ''; return; }
+  const badge = document.getElementById('updatesBadge');
 
+  if(!data || !data.length){
+    box.innerHTML = '<p style="color:#9ca3af;font-size:13.5px;text-align:center;padding:20px 0;">لا توجد تحديثات حاليًا</p>';
+    badge.classList.add('hide');
+    return;
+  }
+
+  badge.textContent = data.length;
+  badge.classList.remove('hide');
   box.innerHTML = data.map(a => `
     <div class="ann-item">
       <div class="ann-title">📢 ${a.title}</div>
@@ -235,19 +275,23 @@ async function loadAnnouncements(){
 async function loadMaterials(){
   const { data } = await supabaseClient.rpc('get_my_track_materials', { p_email: myEmail, p_phone: myPhone });
   const box = document.getElementById('materialsBox');
-  if(!data || !data.length){ box.innerHTML = ''; return; }
+  const badge = document.getElementById('filesBadge');
 
-  box.innerHTML = `
+  if(!data || !data.length){
+    box.innerHTML = '<p style="color:#9ca3af;font-size:13.5px;text-align:center;padding:20px 0;">لا توجد ملفات مرفوعة لمسارك بعد</p>';
+    badge.classList.add('hide');
+    return;
+  }
+
+  badge.textContent = data.length;
+  badge.classList.remove('hide');
+  box.innerHTML = data.map(m => `
     <div class="ann-item" style="background:#eef3ff;border-color:var(--navy);">
-      <div class="ann-title" style="color:var(--navy);">📎 ملفات ومواد مسارك</div>
-      ${data.map(m => `
-        <div style="margin-top:6px;">
-          <a href="${m.url}" target="_blank" style="color:var(--navy);font-weight:700;font-size:13px;text-decoration:underline;">${m.file_name}</a>
-        </div>
-      `).join('')}
+      <a href="${m.url}" target="_blank" style="color:var(--navy);font-weight:700;font-size:13.5px;text-decoration:underline;">📎 ${m.file_name}</a>
     </div>
-  `;
+  `).join('');
 }
+
 
 function buildStars(containerId){
   const el = document.getElementById(containerId);

@@ -129,6 +129,7 @@
   <div class="card hide" id="resultCard">
     <div class="progress-timeline" id="progressTimeline"></div>
     <div id="announcementsBox"></div>
+    <div id="materialsBox"></div>
     <div class="result-name" id="rName"></div>
     <div class="result-track" id="rTrack"></div>
 
@@ -214,6 +215,7 @@ async function lookup(){
   try{ localStorage.setItem('participant_lookup', JSON.stringify({ email, phone })); } catch(_){}
   renderResult(data[0]);
   loadAnnouncements();
+  loadMaterials();
 }
 
 async function loadAnnouncements(){
@@ -228,6 +230,23 @@ async function loadAnnouncements(){
       <div class="ann-date">${new Date(a.created_at).toLocaleDateString('ar-SA', {dateStyle:'medium'})}</div>
     </div>
   `).join('');
+}
+
+async function loadMaterials(){
+  const { data } = await supabaseClient.rpc('get_my_track_materials', { p_email: myEmail, p_phone: myPhone });
+  const box = document.getElementById('materialsBox');
+  if(!data || !data.length){ box.innerHTML = ''; return; }
+
+  box.innerHTML = `
+    <div class="ann-item" style="background:#eef3ff;border-color:var(--navy);">
+      <div class="ann-title" style="color:var(--navy);">📎 ملفات ومواد مسارك</div>
+      ${data.map(m => `
+        <div style="margin-top:6px;">
+          <a href="${m.url}" target="_blank" style="color:var(--navy);font-weight:700;font-size:13px;text-decoration:underline;">${m.file_name}</a>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function buildStars(containerId){

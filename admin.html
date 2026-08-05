@@ -261,6 +261,24 @@
         <h3>التحديثات المرسَلة سابقًا</h3>
         <div id="annList"></div>
       </div>
+
+      <div class="card">
+        <h3>ملفات ومواد المسار</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          ارفع ملفًا (عرض تقديمي، PDF، أي ملف) لمسار معيّن، ويظهر للمشاركين المسجَّلين في نفس المسار كرابط تنزيل مباشر في بوابتهم.
+        </p>
+        <label>المسار</label>
+        <select id="matTrack"></select>
+        <label>اختر الملف</label>
+        <input type="file" id="matFile">
+        <button class="btn btn-gold" style="margin-top:12px;" onclick="uploadTrackMaterial()">رفع الملف</button>
+        <div class="msg" id="matMsg" style="margin-top:10px;font-size:13px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>الملفات المرفوعة</h3>
+        <div id="matList"></div>
+      </div>
     </div>
 
     <div id="tab-team" class="hide">
@@ -450,7 +468,7 @@ function switchTab(name){
     document.getElementById('tab-' + t).classList.toggle('hide', t !== name);
   });
   if(name === 'analytics'){ renderCharts(); renderSurveyStats(); }
-  if(name === 'announcements'){ loadAnnouncements(); }
+  if(name === 'announcements'){ loadAnnouncements(); loadTrackMaterials(); }
 }
 
 async function loadAll(){
@@ -464,6 +482,7 @@ async function loadAll(){
   document.getElementById('editTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('facTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('annTrack').innerHTML = '<option value="">كل المسارات (رسالة عامة)</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
+  document.getElementById('matTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
 
   // استرجاع الفلاتر المحفوظة بالرابط (لو موجودة) عند أول تحميل فقط
   const urlParams = new URLSearchParams(window.location.search);
@@ -1185,6 +1204,56 @@ async function deleteAnnouncement(id){
   await supabaseClient.from('announcements').delete().eq('id', id);
   loadAnnouncements();
   showToast('تم حذف التحديث', 'success');
+}
+
+// ---------- ملفات ومواد المسار ----------
+async function loadTrackMaterials(){
+  const { data } = await supabaseClient.from('track_materials').select('*, tracks(name_ar)').order('uploaded_at', {ascending:false});
+  const list = data || [];
+  document.getElementById('matList').innerHTML = list.map(m => `
+    <div class="trackreg-row">
+      <div style="flex:1;">
+        <a href="${m.url}" target="_blank" style="font-weight:700;color:var(--navy);font-size:13.5px;text-decoration:none;">📎 ${m.file_name}</a>
+        <span style="font-weight:400;color:#9ca3af;font-size:11.5px;"> — ${m.tracks ? m.tracks.name_ar : ''}</span>
+      </div>
+      <button class="small-btn btn-danger" onclick="deleteTrackMaterial('${m.id}')">حذف</button>
+    </div>
+  `).join('') || '<p style="color:#9ca3af;font-size:13px;">لا توجد ملفات مرفوعة بعد</p>';
+}
+
+async function uploadTrackMaterial(){
+  const trackId = document.getElementById('matTrack').value;
+  const fileInput = document.getElementById('matFile');
+  const file = fileInput.files[0];
+  const msg = document.getElementById('matMsg');
+
+  if(!trackId){ msg.style.color = '#9c2b2b'; msg.textContent = 'اختر المسار'; return; }
+  if(!file){ msg.style.color = '#9c2b2b'; msg.textContent = 'اختر ملفًا للرفع'; return; }
+
+  msg.style.color = '#132a5c'; msg.textContent = 'جاري الرفع...';
+
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+  const { error: uploadErr } = await supabaseClient.storage.from('track-materials').upload(path, file);
+  if(uploadErr){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الرفع: ' + friendlyError(uploadErr); return; }
+
+  const { data: urlData } = supabaseClient.storage.from('track-materials').getPublicUrl(path);
+  const { error: insertErr } = await supabaseClient.from('track_materials').insert({
+    track_id: trackId, file_name: file.name, url: urlData.publicUrl
+  });
+
+  if(insertErr){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + friendlyError(insertErr); return; }
+
+  msg.style.color = '#1e7a3f'; msg.textContent = 'تم رفع الملف بنجاح';
+  fileInput.value = '';
+  showToast('تم رفع الملف للمشاركين', 'success');
+  loadTrackMaterials();
+}
+
+async function deleteTrackMaterial(id){
+  if(!confirm('حذف هذا الملف؟')) return;
+  await supabaseClient.from('track_materials').delete().eq('id', id);
+  loadTrackMaterials();
+  showToast('تم حذف الملف', 'success');
 }
 
 function friendlyError(error){

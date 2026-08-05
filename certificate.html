@@ -179,13 +179,16 @@ async function downloadPdf(){
   await new Promise(resolve => setTimeout(resolve, 80));
 
   let canvas;
+  let cloneW, cloneH;
   try {
+    cloneW = clone.offsetWidth;
+    cloneH = clone.offsetHeight;
     canvas = await html2canvas(clone, {
       scale: 3,
       backgroundColor: '#ffffff',
       useCORS: true,
-      width: clone.offsetWidth,
-      height: clone.offsetHeight,
+      width: cloneW,
+      height: cloneH,
     });
   } finally {
     document.body.removeChild(clone);
@@ -193,8 +196,19 @@ async function downloadPdf(){
 
   const img = canvas.toDataURL('image/png');
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });
-  pdf.addImage(img, 'PNG', 0, 0, canvas.width, canvas.height);
+
+  // نحسب مقاس الصفحة بالمليمتر من الأبعاد الفعلية للشهادة (قبل التكبير×3)
+  // هذا المسار (mm) هو الأكثر ثباتًا في jsPDF، ونتجنب به مشاكل وحدة px المعروفة
+  const pxToMm = 25.4 / 96;
+  const pageWmm = cloneW * pxToMm;
+  const pageHmm = cloneH * pxToMm;
+
+  const pdf = new jsPDF({
+    orientation: pageWmm >= pageHmm ? 'l' : 'p',
+    unit: 'mm',
+    format: [pageWmm, pageHmm],
+  });
+  pdf.addImage(img, 'PNG', 0, 0, pageWmm, pageHmm, undefined, 'FAST');
   pdf.save('شهادة-صيف-الابتكار.pdf');
 }
 

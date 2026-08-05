@@ -161,22 +161,35 @@ function formatRange(d1, d3){
 }
 
 async function downloadPdf(){
-  const node = document.getElementById('certNode');
+  const original = document.getElementById('certNode');
 
-  // إصلاح مشكلة معروفة على الجوال: نلغي أي تمرير (scroll) وننسّق الالتقاط
-  // على أبعاد العنصر الفعلية الكاملة بدل الجزء الظاهر بالشاشة فقط
-  window.scrollTo(0, 0);
-  const canvas = await html2canvas(node, {
-    scale: 3,
-    backgroundColor: '#ffffff',
-    useCORS: true,
-    scrollX: 0,
-    scrollY: -window.scrollY,
-    windowWidth: node.scrollWidth,
-    windowHeight: node.scrollHeight,
-    width: node.scrollWidth,
-    height: node.scrollHeight,
-  });
+  // نسخ الشهادة لعنصر منفصل تمامًا خارج الشاشة (بعيدًا عن أي قيود شاشة الجوال
+  // أو موضع التمرير)، والالتقاط منه مباشرة — يحل مشكلة القطع على الجوال نهائيًا
+  const clone = original.cloneNode(true);
+  clone.style.position = 'fixed';
+  clone.style.top = '0';
+  clone.style.left = '-99999px';
+  clone.style.margin = '0';
+  clone.style.width = original.offsetWidth + 'px';
+  clone.style.height = 'auto';
+  clone.style.transform = 'none';
+  document.body.appendChild(clone);
+
+  // نعطي المتصفح لحظة ليرسم النسخة كاملة قبل الالتقاط
+  await new Promise(resolve => setTimeout(resolve, 80));
+
+  let canvas;
+  try {
+    canvas = await html2canvas(clone, {
+      scale: 3,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      width: clone.offsetWidth,
+      height: clone.offsetHeight,
+    });
+  } finally {
+    document.body.removeChild(clone);
+  }
 
   const img = canvas.toDataURL('image/png');
   const { jsPDF } = window.jspdf;

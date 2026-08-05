@@ -162,7 +162,22 @@ function formatRange(d1, d3){
 
 async function downloadPdf(){
   const node = document.getElementById('certNode');
-  const canvas = await html2canvas(node, { scale: 3, backgroundColor: '#ffffff' });
+
+  // إصلاح مشكلة معروفة على الجوال: نلغي أي تمرير (scroll) وننسّق الالتقاط
+  // على أبعاد العنصر الفعلية الكاملة بدل الجزء الظاهر بالشاشة فقط
+  window.scrollTo(0, 0);
+  const canvas = await html2canvas(node, {
+    scale: 3,
+    backgroundColor: '#ffffff',
+    useCORS: true,
+    scrollX: 0,
+    scrollY: -window.scrollY,
+    windowWidth: node.scrollWidth,
+    windowHeight: node.scrollHeight,
+    width: node.scrollWidth,
+    height: node.scrollHeight,
+  });
+
   const img = canvas.toDataURL('image/png');
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [canvas.width, canvas.height] });

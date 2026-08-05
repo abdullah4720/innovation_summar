@@ -49,6 +49,11 @@
   .pt-step.current .pt-dot{background:var(--navy);border-color:var(--navy);color:#fff;}
   .pt-label{font-size:11px;color:#6b7280;text-align:center;font-weight:600;}
   .pt-step.done .pt-label, .pt-step.current .pt-label{color:var(--navy);}
+
+  .ann-item{background:#fff9e6;border:1.5px solid var(--gold);border-radius:12px;padding:12px 14px;margin-bottom:10px;text-align:right;}
+  .ann-item .ann-title{font-weight:700;color:var(--navy);font-size:14px;margin-bottom:3px;}
+  .ann-item .ann-body{font-size:13px;color:#3a3f4b;line-height:1.7;}
+  .ann-item .ann-date{font-size:10.5px;color:#9ca3af;margin-top:6px;}
   .result-track{text-align:center;color:#6b7280;font-size:14px;margin-top:2px;}
 
   .days{display:flex;gap:8px;margin-top:16px;}
@@ -123,6 +128,7 @@
 
   <div class="card hide" id="resultCard">
     <div class="progress-timeline" id="progressTimeline"></div>
+    <div id="announcementsBox"></div>
     <div class="result-name" id="rName"></div>
     <div class="result-track" id="rTrack"></div>
 
@@ -207,6 +213,21 @@ async function lookup(){
   myEmail = email; myPhone = phone;
   try{ localStorage.setItem('participant_lookup', JSON.stringify({ email, phone })); } catch(_){}
   renderResult(data[0]);
+  loadAnnouncements();
+}
+
+async function loadAnnouncements(){
+  const { data } = await supabaseClient.rpc('get_my_announcements', { p_email: myEmail, p_phone: myPhone });
+  const box = document.getElementById('announcementsBox');
+  if(!data || !data.length){ box.innerHTML = ''; return; }
+
+  box.innerHTML = data.map(a => `
+    <div class="ann-item">
+      <div class="ann-title">📢 ${a.title}</div>
+      <div class="ann-body">${a.body}</div>
+      <div class="ann-date">${new Date(a.created_at).toLocaleDateString('ar-SA', {dateStyle:'medium'})}</div>
+    </div>
+  `).join('');
 }
 
 function buildStars(containerId){

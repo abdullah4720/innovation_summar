@@ -154,6 +154,7 @@
   <div class="topbar">
     <h1>لوحة تحكم صيف الابتكار 2026</h1>
     <div class="right">
+      <a href="report.html" style="text-decoration:none;"><button style="border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;">📊 التقرير الشامل</button></a>
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="الوضع الليلي">🌙</button>
       <span id="whoami" dir="ltr"></span>
       <button onclick="logout()">تسجيل الخروج</button>
@@ -164,9 +165,11 @@
     <div class="tabs">
       <div class="tab active" data-tab="participants" onclick="switchTab('participants')">المشاركون</div>
       <div class="tab" data-tab="analytics" onclick="switchTab('analytics')">التحليلات</div>
+      <div class="tab" data-tab="announcements" onclick="switchTab('announcements')">التحديثات والرسائل</div>
       <div class="tab" data-tab="team" onclick="switchTab('team')">فريق الميسّرين</div>
       <div class="tab" data-tab="settings" onclick="switchTab('settings')">الإعدادات</div>
     </div>
+
 
     <!-- تبويب المشاركون -->
     <div id="tab-participants">
@@ -236,6 +239,30 @@
     </div>
 
     <!-- تبويب فريق الميسّرين -->
+    <!-- تبويب التحديثات والرسائل -->
+    <div id="tab-announcements" class="hide">
+      <div class="card">
+        <h3>إرسال تحديث/رسالة جديدة</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          تظهر الرسالة لكل المشاركين المستهدفين فور دخولهم بوابتهم (participant.html). اختر مسارًا معيّنًا أو اتركه "كل المسارات" لتصل للجميع.
+        </p>
+        <label>المسار المستهدف</label>
+        <select id="annTrack"><option value="">كل المسارات (رسالة عامة)</option></select>
+        <label>عنوان الرسالة</label>
+        <input type="text" id="annTitle" placeholder="مثال: تذكير بموعد اليوم الثاني">
+        <label>نص الرسالة</label>
+        <textarea id="annBody" rows="4" placeholder="اكتب تفاصيل التحديث أو المتطلب هنا..."
+          style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+        <button class="btn btn-gold" style="margin-top:12px;" onclick="sendAnnouncement()">إرسال التحديث</button>
+        <div class="msg" id="annMsg" style="margin-top:10px;font-size:13px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>التحديثات المرسَلة سابقًا</h3>
+        <div id="annList"></div>
+      </div>
+    </div>
+
     <div id="tab-team" class="hide">
       <div class="card">
         <h3>إضافة ميسّر</h3>
@@ -419,10 +446,11 @@ function logout(){ supabaseClient.auth.signOut(); location.reload(); }
 
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  ['participants','analytics','team','settings'].forEach(t => {
+  ['participants','analytics','announcements','team','settings'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('hide', t !== name);
   });
   if(name === 'analytics'){ renderCharts(); renderSurveyStats(); }
+  if(name === 'announcements'){ loadAnnouncements(); }
 }
 
 async function loadAll(){
@@ -435,6 +463,7 @@ async function loadAll(){
   sel.innerHTML = '<option value="">كل المسارات</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('editTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('facTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
+  document.getElementById('annTrack').innerHTML = '<option value="">كل المسارات (رسالة عامة)</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
 
   // استرجاع الفلاتر المحفوظة بالرابط (لو موجودة) عند أول تحميل فقط
   const urlParams = new URLSearchParams(window.location.search);
@@ -1115,6 +1144,47 @@ function renderCharts(){
     data: { labels: topOrgs.map(o=>o[0]), datasets: [{ data: topOrgs.map(o=>o[1]), backgroundColor: ['#0B1B3F','#E7B10A','#5b6b98','#f0cf6b','#8a99c4','#c9a544'] } ] },
     options: { plugins:{legend:{position:'bottom', labels:{font:{size:11}}}} }
   });
+}
+
+// ---------- التحديثات والرسائل ----------
+async function loadAnnouncements(){
+  const { data } = await supabaseClient.from('announcements').select('*, tracks(name_ar)').order('created_at', {ascending:false});
+  const list = data || [];
+  document.getElementById('annList').innerHTML = list.map(a => `
+    <div class="trackreg-row">
+      <div style="flex:1;">
+        <div style="font-weight:700;color:var(--navy);font-size:13.5px;">${a.title} <span style="font-weight:400;color:#9ca3af;font-size:11.5px;">— ${a.tracks ? a.tracks.name_ar : 'الكل'}</span></div>
+        <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">${a.body}</div>
+      </div>
+      <button class="small-btn btn-danger" onclick="deleteAnnouncement('${a.id}')">حذف</button>
+    </div>
+  `).join('') || '<p style="color:#9ca3af;font-size:13px;">لا توجد تحديثات مرسلة بعد</p>';
+}
+
+async function sendAnnouncement(){
+  const trackId = document.getElementById('annTrack').value || null;
+  const title = document.getElementById('annTitle').value.trim();
+  const body = document.getElementById('annBody').value.trim();
+  const msg = document.getElementById('annMsg');
+
+  if(!title || !body){ msg.style.color = '#9c2b2b'; msg.textContent = 'أدخل عنوان الرسالة ونصها'; return; }
+
+  const { error } = await supabaseClient.from('announcements').insert({ track_id: trackId, title, body });
+  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الإرسال: ' + friendlyError(error); return; }
+
+  msg.style.color = '#1e7a3f';
+  msg.textContent = 'تم إرسال التحديث بنجاح';
+  document.getElementById('annTitle').value = '';
+  document.getElementById('annBody').value = '';
+  showToast('تم إرسال التحديث للمشاركين', 'success');
+  loadAnnouncements();
+}
+
+async function deleteAnnouncement(id){
+  if(!confirm('حذف هذا التحديث؟')) return;
+  await supabaseClient.from('announcements').delete().eq('id', id);
+  loadAnnouncements();
+  showToast('تم حذف التحديث', 'success');
 }
 
 function friendlyError(error){

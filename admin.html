@@ -67,7 +67,6 @@
   .btn-outline{background:#fff;border:1.5px solid var(--navy);color:var(--navy);}
   .btn-danger{background:#fdecec;color:#9c2b2b;}
   input[type=file]{display:none;}
-  #matFile{display:inline-block !important;padding:8px;border:1.5px solid #dcd3b8;border-radius:8px;font-family:inherit;background:#fff;}
 
   .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;}
   .card h3{margin:0 0 12px;font-size:16px;color:var(--navy);}
@@ -270,8 +269,9 @@
         </p>
         <label>المسار</label>
         <select id="matTrack"></select>
-        <label>اختر الملف</label>
-        <input type="file" id="matFile">
+        <label style="display:inline-block;background:#fff;border:1.5px solid #dcd3b8;border-radius:8px;padding:10px 14px;
+          cursor:pointer;font-family:inherit;font-size:14px;margin-top:6px;" for="matFile" id="matFileLabel">📎 اختر الملف</label>
+        <input type="file" id="matFile" onchange="document.getElementById('matFileLabel').textContent = this.files[0] ? '📎 ' + this.files[0].name : '📎 اختر الملف';">
         <button class="btn btn-gold" style="margin-top:12px;" onclick="uploadTrackMaterial()">رفع الملف</button>
         <div class="msg" id="matMsg" style="margin-top:10px;font-size:13px;"></div>
       </div>
@@ -286,13 +286,14 @@
       <div class="card">
         <h3>إضافة ميسّر</h3>
         <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
-          أنشئ له حسابًا أولًا من Supabase (Authentication → Users)، ثم أدخل بريده هنا واربطه بمساره.
+          أنشئ له حسابًا أولًا من Supabase (Authentication → Users)، ثم أدخل بريده هنا واختر مسار أو أكثر يشرف عليها.
         </p>
         <div class="settings-row">
           <input type="email" id="facEmail" placeholder="بريد الميسّر الإلكتروني" dir="ltr" style="flex:1;min-width:200px;text-align:right;">
-          <select id="facTrack"></select>
         </div>
-        <div class="settings-row" style="margin-top:8px;">
+        <label style="display:block;font-size:13px;font-weight:600;margin:10px 0 6px;color:var(--navy-2);">المسارات المُسنَدة (يمكن اختيار أكثر من مسار)</label>
+        <div id="facTracksChecklist" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div class="settings-row" style="margin-top:12px;">
           <input type="text" id="facPassword" placeholder="كلمة المرور" style="flex:1;min-width:160px;">
           <button class="btn btn-outline" onclick="document.getElementById('facPassword').value = genPassword()">توليد</button>
           <button class="btn btn-gold" onclick="addFacilitator()">إنشاء الحساب وإضافته</button>
@@ -481,7 +482,6 @@ async function loadAll(){
   const sel = document.getElementById('trackFilter');
   sel.innerHTML = '<option value="">كل المسارات</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('editTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
-  document.getElementById('facTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('annTrack').innerHTML = '<option value="">كل المسارات (رسالة عامة)</option>' + tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
   document.getElementById('matTrack').innerHTML = tracks.map(tr => `<option value="${tr.id}">${tr.name_ar}</option>`).join('');
 
@@ -519,15 +519,70 @@ function hasEvaluation(p){ return evaluatedIds.has(p.id); }
 function isEligibleForCertificate(p){ return attendedCount(p) >= minAttendanceDays && hasEvaluation(p); }
 
 async function loadFacilitators(){
-  const { data } = await supabaseClient.from('profiles').select('*, tracks(*)').eq('role', 'facilitator');
+  const { data } = await supabaseClient.from('profiles').select('*').eq('role', 'facilitator');
   facilitators = data || [];
-  document.getElementById('facTbody').innerHTML = facilitators.map(f => `
+  document.getElementById('facTbody').innerHTML = facilitators.map(f => {
+    const names = (f.track_ids || []).map(tid => { const t = tracks.find(x => x.id === tid); return t ? t.name_ar : null; }).filter(Boolean);
+    return `
     <tr>
       <td>${f.full_name || f.id}</td>
-      <td>${f.tracks ? f.tracks.name_ar : '—'}</td>
-      <td><button class="small-btn btn-danger" onclick="removeFacilitator('${f.id}')">إزالة</button></td>
-    </tr>
-  `).join('') || '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:14px;">لا يوجد ميسّرون بعد</td></tr>';
+      <td>${names.length ? names.join('، ') : '—'}</td>
+      <td>
+        <button class="small-btn btn-outline" onclick="openEditFacilitatorTracks('${f.id}')">تعديل المسارات</button>
+        <button class="small-btn btn-danger" onclick="removeFacilitator('${f.id}')">إزالة</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:14px;">لا يوجد ميسّرون بعد</td></tr>';
+
+  renderFacTracksChecklist();
+}
+
+function renderFacTracksChecklist(){
+  const box = document.getElementById('facTracksChecklist');
+  if(!box) return;
+  box.innerHTML = tracks.map(t => `
+    <label style="display:flex;align-items:center;gap:6px;background:#fffdf7;border:1.5px solid #dcd3b8;
+      border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;">
+      <input type="checkbox" class="fac-track-cb" value="${t.id}"> ${t.name_ar}
+    </label>
+  `).join('');
+}
+
+async function openEditFacilitatorTracks(facId){
+  const f = facilitators.find(x => x.id === facId);
+  const currentIds = new Set(f.track_ids || []);
+  const optionsHtml = tracks.map(t => `
+    <label style="display:flex;align-items:center;gap:6px;background:#fffdf7;border:1.5px solid #dcd3b8;
+      border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;margin-bottom:6px;">
+      <input type="checkbox" class="edit-fac-track-cb" value="${t.id}" ${currentIds.has(t.id)?'checked':''}> ${t.name_ar}
+    </label>
+  `).join('');
+
+  const modalHtml = `
+    <div class="modal-bg" id="editFacModalBg">
+      <div class="modal">
+        <h3>تعديل مسارات الميسّر</h3>
+        <p style="font-size:13px;color:#6b7280;">${f.full_name || ''}</p>
+        <div style="max-height:260px;overflow-y:auto;">${optionsHtml}</div>
+        <div class="actions">
+          <button class="btn btn-outline" onclick="document.getElementById('editFacModalBg').remove()">إلغاء</button>
+          <button class="btn btn-gold" onclick="saveFacilitatorTracks('${facId}')">حفظ</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function saveFacilitatorTracks(facId){
+  const selected = [...document.querySelectorAll('.edit-fac-track-cb:checked')].map(cb => cb.value);
+  if(!selected.length){ showToast('اختر مسارًا واحدًا على الأقل', 'error'); return; }
+
+  const { error } = await supabaseClient.from('profiles').update({ track_ids: selected }).eq('id', facId);
+  document.getElementById('editFacModalBg').remove();
+  if(error){ showToast('تعذّر الحفظ: ' + friendlyError(error), 'error'); return; }
+
+  showToast('تم تحديث مسارات الميسّر', 'success');
+  loadFacilitators();
 }
 
 function attendedCount(p){
@@ -963,13 +1018,15 @@ async function callCreateUser(payload){
   }
 }
 
-function facilitatorFallbackSql(email, trackCode){
-  return `insert into profiles (id, role, track_id, full_name)
-select u.id, 'facilitator', t.id, u.email
-from auth.users u, tracks t
+function facilitatorFallbackSql(email, trackCodes){
+  const codesArr = (trackCodes || []).map(c => `'${c}'`).join(', ');
+  return `insert into profiles (id, role, track_ids, full_name)
+select u.id, 'facilitator',
+  (select array_agg(id) from tracks where code in (${codesArr})),
+  u.email
+from auth.users u
 where u.email = '${email}'
-  and t.code = '${trackCode}'
-on conflict (id) do update set role = 'facilitator', track_id = excluded.track_id;`;
+on conflict (id) do update set role = 'facilitator', track_ids = excluded.track_ids;`;
 }
 
 function adminFallbackSql(email){
@@ -992,19 +1049,20 @@ function showFallbackSql(msgEl, email, sql){
 
 async function addFacilitator(){
   const email = document.getElementById('facEmail').value.trim();
-  const trackId = document.getElementById('facTrack').value;
+  const trackIds = [...document.querySelectorAll('.fac-track-cb:checked')].map(cb => cb.value);
   const password = document.getElementById('facPassword').value.trim();
   const msg = document.getElementById('facMsg');
   msg.style.color = '#9c2b2b';
   msg.innerHTML = '';
 
   if(!email || !password){ msg.textContent = 'أدخل البريد وكلمة المرور (أو اضغط توليد)'; return; }
+  if(!trackIds.length){ msg.textContent = 'اختر مسارًا واحدًا على الأقل'; return; }
 
-  const { ok, result, fallback } = await callCreateUser({ email, password, role: 'facilitator', track_id: trackId, full_name: email });
+  const { ok, result, fallback } = await callCreateUser({ email, password, role: 'facilitator', track_ids: trackIds, full_name: email });
 
   if(fallback){
-    const track = tracks.find(t => t.id === trackId);
-    showFallbackSql(msg, email, facilitatorFallbackSql(email, track ? track.code : ''));
+    const codes = trackIds.map(id => { const t = tracks.find(x => x.id === id); return t ? t.code : null; }).filter(Boolean);
+    showFallbackSql(msg, email, facilitatorFallbackSql(email, codes));
     return;
   }
   if(!ok){ msg.textContent = 'تعذّر الإنشاء: ' + (result.error || 'خطأ غير معروف'); return; }

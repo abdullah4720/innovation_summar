@@ -94,7 +94,7 @@
 
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>الجوال</th><th>اليوم 1</th><th>اليوم 2</th><th>اليوم 3</th></tr></thead>
+        <thead><tr id="tableHead"><th>#</th><th>الاسم</th><th>البريد</th><th>الجوال</th><th>اليوم 1</th><th>اليوم 2</th><th>اليوم 3</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -116,22 +116,28 @@ function toggleTheme(){
   document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
 }
 
-let myTrack = null;
+let myTracks = [];
 let participants = [];
 
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
   if(session){
-    const { data: profile } = await supabaseClient.from('profiles').select('*, tracks(*)').eq('id', session.user.id).single();
-    if(!profile || profile.role !== 'facilitator' || !profile.tracks){
+    const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
+    if(!profile || profile.role !== 'facilitator' || !profile.track_ids || !profile.track_ids.length){
       alert('هذا الحساب غير مسند كميسّر لأي مسار. تواصل مع مدير البرنامج.');
       await supabaseClient.auth.signOut();
       return;
     }
-    myTrack = profile.tracks;
+    const { data: tr } = await supabaseClient.from('tracks').select('*').in('id', profile.track_ids);
+    myTracks = tr || [];
     document.getElementById('loginCard').classList.add('hide');
     document.getElementById('app').classList.remove('hide');
     document.getElementById('whoami').textContent = session.user.email;
-    document.getElementById('trackName').textContent = myTrack.name_ar;
+    document.getElementById('trackName').textContent = myTracks.map(t => t.name_ar).join('  •  ');
+    if(myTracks.length > 1){
+      const th = document.createElement('th');
+      th.textContent = 'المسار';
+      document.getElementById('tableHead').insertBefore(th, document.getElementById('tableHead').children[4]);
+    }
     loadParticipants();
   }
 });
@@ -145,8 +151,8 @@ async function login(){
 function logout(){ supabaseClient.auth.signOut(); location.reload(); }
 
 async function loadParticipants(){
-  // RLS تحصر النتائج تلقائيًا على مسار هذا الميسّر فقط
-  const { data } = await supabaseClient.from('participants').select('*').order('full_name');
+  // RLS تحصر النتائج تلقائيًا على المسارات المُسنَدة لهذا الميسّر فقط
+  const { data } = await supabaseClient.from('participants').select('*, tracks(*)').order('full_name');
   participants = data || [];
   renderStats();
   renderTable();
@@ -168,18 +174,21 @@ function renderStats(){
 function renderTable(){
   const q = document.getElementById('search').value.trim().toLowerCase();
   const filtered = participants.filter(p => !q || p.full_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
+  const showTrackCol = myTracks.length > 1;
   document.getElementById('tbody').innerHTML = filtered.map((p, i) => `
     <tr>
       <td>${i + 1}</td>
       <td>${p.full_name}</td><td dir="ltr" style="text-align:right;">${p.email}</td><td dir="ltr" style="text-align:right;">${p.phone || ''}</td>
+      ${showTrackCol ? `<td>${p.tracks ? p.tracks.name_ar : ''}</td>` : ''}
       <td>${dayCell(p,1)}</td><td>${dayCell(p,2)}</td><td>${dayCell(p,3)}</td>
     </tr>
-  `).join('') || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:20px;">لا يوجد مشاركون</td></tr>';
+  `).join('') || `<tr><td colspan="${showTrackCol?8:7}" style="text-align:center;color:#9ca3af;padding:20px;">لا يوجد مشاركون</td></tr>`;
 }
 
 function dayCell(p, n){
   const val = p[`day${n}_attended`]; // true | false | null
-  const isActive = myTrack.active_day === n;
+  const track = p.tracks || myTracks.find(t => t.id === p.track_id);
+  const isActive = track && track.active_day === n;
   const disabledAttr = isActive ? '' : 'disabled title="لم يُفعَّل هذا اليوم بعد من المدير"';
   return `<div class="day-btns">
     <button class="day-btn present ${val===true?'active':''}" ${disabledAttr} onclick="setDay('${p.id}', ${n}, true)">✓</button>
@@ -188,8 +197,9 @@ function dayCell(p, n){
 }
 
 async function setDay(id, n, value){
-  if(myTrack.active_day !== n){ alert('هذا اليوم غير مفعّل بعد. تواصل مع المدير لتفعيله قبل تسجيل الحضور.'); return; }
   const p = participants.find(x => x.id === id);
+  const track = p.tracks || myTracks.find(t => t.id === p.track_id);
+  if(!track || track.active_day !== n){ alert('هذا اليوم غير مفعّل بعد. تواصل مع المدير لتفعيله قبل تسجيل الحضور.'); return; }
   const field = `day${n}_attended`;
   const newVal = (p[field] === value) ? null : value;
   const { error } = await supabaseClient.from('participants').update({ [field]: newVal }).eq('id', id);

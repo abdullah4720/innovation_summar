@@ -1247,15 +1247,34 @@ async function sendAnnouncement(){
 
   if(!title || !body){ msg.style.color = '#9c2b2b'; msg.textContent = 'أدخل عنوان الرسالة ونصها'; return; }
 
-  const { error } = await supabaseClient.from('announcements').insert({ track_id: trackId, title, body });
+  const { data: inserted, error } = await supabaseClient.from('announcements').insert({ track_id: trackId, title, body }).select().single();
   if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الإرسال: ' + friendlyError(error); return; }
 
   msg.style.color = '#1e7a3f';
-  msg.textContent = 'تم إرسال التحديث بنجاح';
+  msg.textContent = 'تم نشر التحديث، جاري إرسال البريد للمشاركين...';
   document.getElementById('annTitle').value = '';
   document.getElementById('annBody').value = '';
-  showToast('تم إرسال التحديث للمشاركين', 'success');
+  showToast('تم نشر التحديث للمشاركين', 'success');
   loadAnnouncements();
+
+  // إرسال بريد إلكتروني لكل المشاركين المستهدفين بهذا التحديث
+  try{
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/send-announcement-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionData.session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ announcement_id: inserted.id }),
+    });
+    const result = await res.json();
+    if(res.ok) showToast(`تم إرسال البريد لـ ${result.sent} مشارك`, 'success');
+    else showToast('التحديث نُشر لكن تعذّر إرسال البريد: ' + (result.error || ''), 'error');
+  } catch(_){
+    showToast('التحديث نُشر لكن تعذّر إرسال البريد (تأكد من نشر دالة send-announcement-email)', 'error');
+  }
 }
 
 async function deleteAnnouncement(id){

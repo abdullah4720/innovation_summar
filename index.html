@@ -261,6 +261,13 @@ document.getElementById('regForm').addEventListener('submit', async (e) => {
   successCard.classList.add('show');
   document.getElementById('successSummary').textContent =
     `${payload.full_name} — مسار: ${track ? track.name_ar : ''}`;
+
+  // إرسال بريد تأكيد تلقائي (لا نعطّل الواجهة لو تأخر أو فشل الإرسال)
+  fetch(`${SUPABASE_URL}/functions/v1/send-confirmation-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+    body: JSON.stringify({ email: payload.email }),
+  }).catch(() => {});
 });
 </script>
 </body>

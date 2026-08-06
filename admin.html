@@ -378,6 +378,34 @@
         <button class="btn btn-navy" style="margin-top:12px;" onclick="saveRegistrationControl()">حفظ إعدادات التسجيل</button>
         <div class="msg" id="regSettingsMsg" style="margin-top:10px;font-size:13px;"></div>
       </div>
+
+      <div class="card">
+        <h3>قوالب الرسائل الإلكترونية</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          عدّل نص أي رسالة تُرسل تلقائيًا للمشاركين. استخدم الكلمات بين قوسين ({{ }}) وتُستبدل تلقائيًا ببيانات كل مشارك.
+        </p>
+
+        <h4 style="margin:16px 0 4px;font-size:14px;color:var(--navy);">📧 رسالة تأكيد التسجيل</h4>
+        <p style="font-size:11.5px;color:#9ca3af;margin:0 0 6px;">المتاح: {{name}} الاسم، {{track}} المسار، {{dates}} التواريخ</p>
+        <label>عنوان الرسالة</label>
+        <input type="text" id="confirmSubject">
+        <label>نص الرسالة</label>
+        <textarea id="confirmBody" rows="6" style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+
+        <h4 style="margin:20px 0 4px;font-size:14px;color:var(--navy);">⏰ رسالة التذكير اليومي (قبل بداية المسار بيوم)</h4>
+        <p style="font-size:11.5px;color:#9ca3af;margin:0 0 6px;">المتاح: {{track}} المسار</p>
+        <label>عنوان الرسالة</label>
+        <input type="text" id="reminderSubject">
+        <label>نص الرسالة</label>
+        <textarea id="reminderBody" rows="6" style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+
+        <p style="font-size:11.5px;color:#9ca3af;margin-top:10px;">
+          ملاحظة: رسالة "التحديثات" تُكتب مباشرة من تبويب "التحديثات والرسائل" في كل مرة، فما تحتاج قالبًا ثابتًا هنا.
+        </p>
+
+        <button class="btn btn-navy" style="margin-top:12px;" onclick="saveEmailTemplates()">حفظ القوالب</button>
+        <div class="msg" id="templatesMsg" style="margin-top:10px;font-size:13px;"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -505,6 +533,11 @@ async function loadAll(){
   document.getElementById('regOpensAt').value = toDatetimeLocal(settings && settings.registration_opens_at);
   document.getElementById('regClosesAt').value = toDatetimeLocal(settings && settings.registration_closes_at);
   document.getElementById('regClosedMessage').value = (settings && settings.registration_closed_message) || '';
+
+  document.getElementById('confirmSubject').value = (settings && settings.confirmation_subject) || '';
+  document.getElementById('confirmBody').value = (settings && settings.confirmation_body) || '';
+  document.getElementById('reminderSubject').value = (settings && settings.reminder_subject) || '';
+  document.getElementById('reminderBody').value = (settings && settings.reminder_body) || '';
 
   await loadFacilitators();
   await loadAdmins();
@@ -1160,6 +1193,22 @@ async function saveRegistrationControl(){
   if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + friendlyError(error); return; }
   msg.style.color = '#1e7a3f';
   msg.textContent = 'تم حفظ إعدادات التسجيل';
+}
+
+async function saveEmailTemplates(){
+  const msg = document.getElementById('templatesMsg');
+  const payload = {
+    confirmation_subject: document.getElementById('confirmSubject').value.trim() || null,
+    confirmation_body: document.getElementById('confirmBody').value.trim() || null,
+    reminder_subject: document.getElementById('reminderSubject').value.trim() || null,
+    reminder_body: document.getElementById('reminderBody').value.trim() || null,
+  };
+
+  const { error } = await supabaseClient.from('app_settings').update(payload).eq('id', 1);
+  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + friendlyError(error); return; }
+  msg.style.color = '#1e7a3f';
+  msg.textContent = 'تم حفظ القوالب — التعديل يسري على الرسائل القادمة فورًا';
+  showToast('تم حفظ قوالب الرسائل', 'success');
 }
 
 // ---------- التحليلات ----------

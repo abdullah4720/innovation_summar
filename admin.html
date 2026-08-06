@@ -1281,7 +1281,7 @@ async function loadAnnouncements(){
     <div class="trackreg-row">
       <div style="flex:1;">
         <div style="font-weight:700;color:var(--navy);font-size:13.5px;">${a.title} <span style="font-weight:400;color:#9ca3af;font-size:11.5px;">— ${a.tracks ? a.tracks.name_ar : 'الكل'}</span></div>
-        <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">${a.body}</div>
+        <div style="font-size:12.5px;color:#6b7280;margin-top:2px;white-space:pre-line;">${a.body}</div>
       </div>
       <button class="small-btn btn-danger" onclick="deleteAnnouncement('${a.id}')">حذف</button>
     </div>

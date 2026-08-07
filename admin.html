@@ -142,6 +142,11 @@
   .ann-preview-banner{background:var(--navy);padding:14px 18px;}
   .ann-preview-body{background:#fff;padding:18px;}
   body.dark .ann-preview-body{background:var(--surface);color:var(--text);}
+
+  .tpl-preview{margin-top:8px;padding:12px 14px;border:1.5px dashed var(--line);border-radius:10px;
+    background:#fffdf7;font-size:13px;color:#3a3f4b;line-height:1.7;}
+  .tpl-preview .tpl-preview-label{font-size:10.5px;color:#9ca3af;font-weight:700;margin-bottom:6px;}
+  body.dark .tpl-preview{background:var(--surface);}
   .settings-row input{width:90px;}
 
   .toast-container{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:200;
@@ -249,6 +254,7 @@
       <div class="card" id="surveyCard">
         <h3>نتائج استبيان التقييم</h3>
         <div id="surveyStats" class="stats"></div>
+        <button class="btn btn-outline" style="margin-top:12px;" onclick="exportEvaluationNotes()">تصدير ملاحظات الاستبيان (Excel)</button>
       </div>
 
       <div class="card">
@@ -462,14 +468,36 @@
         <label>عنوان الرسالة</label>
         <input type="text" id="confirmSubject">
         <label>نص الرسالة</label>
-        <textarea id="confirmBody" rows="6" style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+        <div class="rte-toolbar">
+          <button type="button" onclick="rteCmd('bold','confirmBody')" title="غامق"><b>B</b></button>
+          <select onchange="rteFontSize(this.value,'confirmBody')" title="حجم الخط">
+            <option value="3">حجم عادي</option>
+            <option value="5">حجم كبير</option>
+            <option value="2">حجم صغير</option>
+          </select>
+          <button type="button" onclick="rteCmd('insertUnorderedList','confirmBody')" title="قائمة نقطية">•</button>
+        </div>
+        <div id="confirmBody" class="rte-editor" contenteditable="true"
+          data-placeholder="اكتب نص رسالة التأكيد هنا..." oninput="updateTemplatePreview('confirm')"></div>
+        <div class="tpl-preview" id="confirmPreview"></div>
 
         <h4 style="margin:20px 0 4px;font-size:14px;color:var(--navy);">⏰ رسالة التذكير اليومي (قبل بداية المسار بيوم)</h4>
         <p style="font-size:11.5px;color:#9ca3af;margin:0 0 6px;">المتاح: {{track}} المسار</p>
         <label>عنوان الرسالة</label>
         <input type="text" id="reminderSubject">
         <label>نص الرسالة</label>
-        <textarea id="reminderBody" rows="6" style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+        <div class="rte-toolbar">
+          <button type="button" onclick="rteCmd('bold','reminderBody')" title="غامق"><b>B</b></button>
+          <select onchange="rteFontSize(this.value,'reminderBody')" title="حجم الخط">
+            <option value="3">حجم عادي</option>
+            <option value="5">حجم كبير</option>
+            <option value="2">حجم صغير</option>
+          </select>
+          <button type="button" onclick="rteCmd('insertUnorderedList','reminderBody')" title="قائمة نقطية">•</button>
+        </div>
+        <div id="reminderBody" class="rte-editor" contenteditable="true"
+          data-placeholder="اكتب نص رسالة التذكير هنا..." oninput="updateTemplatePreview('reminder')"></div>
+        <div class="tpl-preview" id="reminderPreview"></div>
 
         <p style="font-size:11.5px;color:#9ca3af;margin-top:10px;">
           ملاحظة: رسالة "التحديثات" تُكتب مباشرة من تبويب "التحديثات والرسائل" في كل مرة، فما تحتاج قالبًا ثابتًا هنا.
@@ -612,7 +640,7 @@ async function loadAll(){
   const { data: p } = await supabaseClient.from('participants').select('*, tracks(*)').order('full_name', {ascending:true});
   participants = p || [];
 
-  const { data: evals } = await supabaseClient.from('evaluations').select('participant_id, rating_content, rating_trainer, rating_organization, rating_overall, submitted_at');
+  const { data: evals } = await supabaseClient.from('evaluations').select('participant_id, rating_content, rating_trainer, rating_organization, rating_overall, comment, submitted_at, participants(full_name), tracks(name_ar)');
   evaluations = evals || [];
   evaluatedIds = new Set(evaluations.map(e => e.participant_id));
 
@@ -626,9 +654,11 @@ async function loadAll(){
   document.getElementById('regClosedMessage').value = (settings && settings.registration_closed_message) || '';
 
   document.getElementById('confirmSubject').value = (settings && settings.confirmation_subject) || '';
-  document.getElementById('confirmBody').value = (settings && settings.confirmation_body) || '';
+  document.getElementById('confirmBody').innerHTML = toEditorHtml(settings && settings.confirmation_body);
   document.getElementById('reminderSubject').value = (settings && settings.reminder_subject) || '';
-  document.getElementById('reminderBody').value = (settings && settings.reminder_body) || '';
+  document.getElementById('reminderBody').innerHTML = toEditorHtml(settings && settings.reminder_body);
+  updateTemplatePreview('confirm');
+  updateTemplatePreview('reminder');
 
   await loadFacilitators();
   await loadAdmins();
@@ -1345,9 +1375,9 @@ async function saveEmailTemplates(){
   const msg = document.getElementById('templatesMsg');
   const payload = {
     confirmation_subject: document.getElementById('confirmSubject').value.trim() || null,
-    confirmation_body: document.getElementById('confirmBody').value.trim() || null,
+    confirmation_body: document.getElementById('confirmBody').innerHTML.trim() || null,
     reminder_subject: document.getElementById('reminderSubject').value.trim() || null,
-    reminder_body: document.getElementById('reminderBody').value.trim() || null,
+    reminder_body: document.getElementById('reminderBody').innerHTML.trim() || null,
   };
 
   const { error } = await supabaseClient.from('app_settings').update(payload).eq('id', 1);
@@ -1358,6 +1388,25 @@ async function saveEmailTemplates(){
 }
 
 // ---------- التحليلات ----------
+function exportEvaluationNotes(){
+  if(!evaluations.length){ showToast('لا توجد تقييمات لتصديرها بعد', 'info'); return; }
+
+  const rows = evaluations.map(e => ({
+    'اسم المشارك': e.participants ? e.participants.full_name : '',
+    'المسار': e.tracks ? e.tracks.name_ar : '',
+    'تقييم المحتوى': e.rating_content,
+    'تقييم المدرب': e.rating_trainer,
+    'تقييم التنظيم': e.rating_organization,
+    'التقييم العام': e.rating_overall,
+    'الملاحظات': e.comment || '',
+    'تاريخ التقييم': e.submitted_at,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ملاحظات الاستبيان');
+  XLSX.writeFile(wb, 'ملاحظات_استبيان_صيف_الابتكار_2026.xlsx');
+}
+
 function renderSurveyStats(){
   const box = document.getElementById('surveyStats');
   const total = evaluations.length;
@@ -1435,15 +1484,17 @@ function renderCharts(){
 
 // ---------- التحديثات والرسائل ----------
 // ---------- محرر التنسيق البسيط للتحديثات ----------
-function rteCmd(command){
-  document.getElementById('annBodyEditor').focus();
+function rteCmd(command, targetId){
+  const id = targetId || 'annBodyEditor';
+  document.getElementById(id).focus();
   document.execCommand(command, false, null);
-  updateAnnPreview();
+  if(id === 'annBodyEditor') updateAnnPreview();
 }
-function rteFontSize(size){
-  document.getElementById('annBodyEditor').focus();
+function rteFontSize(size, targetId){
+  const id = targetId || 'annBodyEditor';
+  document.getElementById(id).focus();
   document.execCommand('fontSize', false, size);
-  updateAnnPreview();
+  if(id === 'annBodyEditor') updateAnnPreview();
 }
 function updateAnnPreview(){
   const title = document.getElementById('annTitle').value.trim();
@@ -1453,6 +1504,25 @@ function updateAnnPreview(){
 }
 const titleInputForPreview = document.getElementById('annTitle');
 if(titleInputForPreview) titleInputForPreview.addEventListener('input', updateAnnPreview);
+
+// تحويل نص عادي قديم (بفواصل أسطر) إلى HTML متوافق مع المحرر، أو إبقاء HTML كما هو لو كان جاهزًا مسبقًا
+function toEditorHtml(value){
+  if(!value) return '';
+  if(value.includes('<')) return value; // محتوى HTML مُنسّق مسبقًا
+  return value.split('\n').filter(l => l.trim()).map(l => `<div>${l}</div>`).join('');
+}
+
+const TEMPLATE_SAMPLE = { name: 'عبدالله صالح', track: 'ريادة الأعمال', dates: '27 يوليو إلى 29 يوليو' };
+
+function updateTemplatePreview(which){
+  const body = document.getElementById(which + 'Body').innerHTML.trim();
+  const filled = body
+    .replaceAll('{{name}}', TEMPLATE_SAMPLE.name)
+    .replaceAll('{{track}}', TEMPLATE_SAMPLE.track)
+    .replaceAll('{{dates}}', TEMPLATE_SAMPLE.dates);
+  document.getElementById(which + 'Preview').innerHTML =
+    '<div class="tpl-preview-label">معاينة (ببيانات تجريبية)</div>' + (filled || '<span style="color:#9ca3af;">اكتب نصًا لترى المعاينة هنا...</span>');
+}
 
 async function loadAnnouncements(){
   const { data } = await supabaseClient.from('announcements').select('*, tracks(name_ar)').order('created_at', {ascending:false});

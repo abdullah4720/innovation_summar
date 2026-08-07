@@ -182,12 +182,18 @@
       <div class="tab" data-tab="analytics" onclick="switchTab('analytics')">التحليلات</div>
       <div class="tab" data-tab="announcements" onclick="switchTab('announcements')">التحديثات والرسائل</div>
       <div class="tab" data-tab="team" onclick="switchTab('team')">فريق الميسّرين</div>
+      <div class="tab" data-tab="auditlog" onclick="switchTab('auditlog')">سجل النشاط</div>
       <div class="tab" data-tab="settings" onclick="switchTab('settings')">الإعدادات</div>
     </div>
 
 
     <!-- تبويب المشاركون -->
     <div id="tab-participants">
+      <div class="card" id="todayCard">
+        <h3>📌 نظرة اليوم</h3>
+        <div class="stats" id="todayStats"></div>
+      </div>
+
       <div class="stats" id="statsRow"></div>
 
       <div class="card" id="dayActivationCard">
@@ -243,6 +249,16 @@
       <div class="card" id="surveyCard">
         <h3>نتائج استبيان التقييم</h3>
         <div id="surveyStats" class="stats"></div>
+      </div>
+
+      <div class="card">
+        <h3>مقارنة المسارات</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>المسار</th><th>مسجلون</th><th>حضور كامل</th><th>شهادات صادرة</th><th>متوسط التقييم</th></tr></thead>
+            <tbody id="compareTbody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="charts-grid">
@@ -378,6 +394,21 @@
     </div>
 
     <!-- تبويب الإعدادات -->
+    <div id="tab-auditlog" class="hide">
+      <div class="card">
+        <h3>سجل النشاط</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          آخر التعديلات على الحضور والشهادات، مين سواها ومتى — للمتابعة لو أكثر من مسؤول أو ميسّر يشتغلون بالتوازي.
+        </p>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>الوقت</th><th>المشارك</th><th>التغيير</th><th>بواسطة</th></tr></thead>
+            <tbody id="auditLogTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-settings" class="hide">
       <div class="card">
         <h3>معيار إصدار الشهادة</h3>
@@ -535,11 +566,30 @@ function logout(){ supabaseClient.auth.signOut(); location.reload(); }
 
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  ['participants','analytics','announcements','team','settings'].forEach(t => {
+  ['participants','analytics','announcements','team','auditlog','settings'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('hide', t !== name);
   });
-  if(name === 'analytics'){ renderCharts(); renderSurveyStats(); }
+  if(name === 'analytics'){ renderCharts(); renderSurveyStats(); loadTrackComparison(); }
   if(name === 'announcements'){ loadAnnouncements(); loadTrackMaterials(); }
+  if(name === 'auditlog'){ loadAuditLog(); }
+}
+
+async function loadAuditLog(){
+  const { data } = await supabaseClient.from('audit_log').select('*').order('created_at', {ascending:false}).limit(100);
+  const rows = data || [];
+  document.getElementById('auditLogTbody').innerHTML = rows.map(r => {
+    const changesText = Object.entries(r.details || {})
+      .filter(([k]) => k !== 'اسم_المشارك')
+      .map(([k,v]) => `${k}: ${v.من === null ? '—' : (v.من ? 'حاضر':'غائب/إلغاء')} ← ${v.إلى === null ? '—' : (v.إلى === true ? 'حاضر' : (v.إلى === false ? 'غائب' : v.إلى))}`)
+      .join('، ');
+    return `
+    <tr>
+      <td style="white-space:nowrap;font-size:12px;">${new Date(r.created_at).toLocaleString('ar-SA', {dateStyle:'short', timeStyle:'short'})}</td>
+      <td>${(r.details && r.details.اسم_المشارك) || '—'}</td>
+      <td style="font-size:12px;">${changesText || '—'}</td>
+      <td dir="ltr" style="text-align:right;font-size:12px;">${r.actor_email || '—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:20px;">لا يوجد نشاط مسجَّل بعد</td></tr>';
 }
 
 async function loadAll(){
@@ -562,7 +612,7 @@ async function loadAll(){
   const { data: p } = await supabaseClient.from('participants').select('*, tracks(*)').order('full_name', {ascending:true});
   participants = p || [];
 
-  const { data: evals } = await supabaseClient.from('evaluations').select('participant_id, rating_content, rating_trainer, rating_organization, rating_overall');
+  const { data: evals } = await supabaseClient.from('evaluations').select('participant_id, rating_content, rating_trainer, rating_organization, rating_overall, submitted_at');
   evaluations = evals || [];
   evaluatedIds = new Set(evaluations.map(e => e.participant_id));
 
@@ -583,8 +633,10 @@ async function loadAll(){
   await loadFacilitators();
   await loadAdmins();
   await loadTrackRegStatus();
+  await loadWaitlistCounts();
   renderDayActivation();
   renderTrackRegControl();
+  renderTodayStats();
   renderStats();
   renderTable();
 }
@@ -818,12 +870,28 @@ async function loadTrackRegStatus(){
   (data || []).forEach(s => { trackRegStatus[s.track_id] = s; });
 }
 
+function renderTodayStats(){
+  const todayStr = new Date().toISOString().slice(0,10);
+  const activeTracks = tracks.filter(t => t.day1_date === todayStr || t.day2_date === todayStr || t.day3_date === todayStr);
+  const pendingCerts = participants.filter(p => !p.certificate_issued && isEligibleForCertificate(p)).length;
+  const todayEvals = evaluations.filter(e => e.submitted_at && e.submitted_at.slice(0,10) === todayStr).length;
+
+  document.getElementById('todayStats').innerHTML = `
+    <div class="stat"><div class="num">${activeTracks.length}</div><div class="lbl">مسار نشط اليوم</div></div>
+    <div class="stat"><div class="num">${pendingCerts}</div><div class="lbl">شهادات بانتظار الإصدار</div></div>
+    <div class="stat"><div class="num">${todayEvals}</div><div class="lbl">استبيان جديد اليوم</div></div>
+  `;
+}
+
+let waitlistCounts = {};
+
 function renderTrackRegControl(){
   document.getElementById('trackRegRows').innerHTML = tracks.map(t => {
     const status = trackRegStatus[t.id] || {};
     const count = status.registered_count ?? 0;
     const capacity = t.capacity ?? '';
     const isOpen = t.registration_open !== false;
+    const waiting = waitlistCounts[t.id] || 0;
     return `
     <div class="trackreg-row">
       <div class="track-label">${t.name_ar}</div>
@@ -831,8 +899,44 @@ function renderTrackRegControl(){
       <input type="number" min="0" placeholder="السعة" value="${capacity}" id="cap_${t.id}">
       <button class="btn btn-outline" style="padding:6px 10px;font-size:12.5px;" onclick="saveTrackCapacity('${t.id}')">حفظ السعة</button>
       <button class="toggle-btn ${isOpen ? 'open' : 'closed'}" onclick="toggleTrackReg('${t.id}')">${isOpen ? 'مفتوح' : 'مغلق'}</button>
+      ${waiting > 0 ? `<button class="small-btn btn-outline" onclick="viewWaitlist('${t.id}', '${t.name_ar.replace(/'/g,"")}')">قائمة الانتظار (${waiting})</button>` : ''}
     </div>`;
   }).join('');
+}
+
+async function loadWaitlistCounts(){
+  const { data } = await supabaseClient.rpc('get_waitlist_counts');
+  waitlistCounts = {};
+  (data || []).forEach(w => { waitlistCounts[w.track_id] = w.waiting_count; });
+}
+
+async function viewWaitlist(trackId, trackName){
+  const { data } = await supabaseClient.from('waitlist').select('*').eq('track_id', trackId).order('created_at');
+  const rows = (data || []).map(w => `
+    <tr><td>${w.full_name}</td><td dir="ltr" style="text-align:right;">${w.email}</td><td dir="ltr" style="text-align:right;">${w.phone}</td>
+    <td><button class="small-btn btn-danger" onclick="removeFromWaitlist('${w.id}', '${trackId}', '${trackName.replace(/'/g,"")}')">إزالة</button></td></tr>
+  `).join('') || '<tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:14px;">القائمة فاضية</td></tr>';
+
+  const modalHtml = `
+    <div class="modal-bg" id="waitlistViewModalBg">
+      <div class="modal" style="max-width:520px;">
+        <h3>قائمة الانتظار — ${trackName}</h3>
+        <div style="max-height:320px;overflow-y:auto;">
+          <table style="width:100%;"><thead><tr><th>الاسم</th><th>البريد</th><th>الجوال</th><th></th></tr></thead>
+          <tbody>${rows}</tbody></table>
+        </div>
+        <div class="actions"><button class="btn btn-outline" onclick="document.getElementById('waitlistViewModalBg').remove()">إغلاق</button></div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function removeFromWaitlist(id, trackId, trackName){
+  await supabaseClient.from('waitlist').delete().eq('id', id);
+  document.getElementById('waitlistViewModalBg').remove();
+  await loadWaitlistCounts();
+  renderTrackRegControl();
+  viewWaitlist(trackId, trackName);
 }
 
 async function saveTrackCapacity(trackId){
@@ -888,7 +992,8 @@ async function issueCertificate(id){
   }
   const code = genCertCode();
   const { error } = await supabaseClient.from('participants').update({ certificate_issued: true, certificate_code: code }).eq('id', id);
-  if(!error){ p.certificate_issued = true; p.certificate_code = code; renderStats(); renderTable(); }
+  if(error){ showToast(friendlyError(error), 'error'); return; }
+  p.certificate_issued = true; p.certificate_code = code; renderStats(); renderTable();
 }
 
 async function issueSelectedCertificates(){
@@ -1268,6 +1373,20 @@ function renderSurveyStats(){
     <div class="stat"><div class="num">${avg('rating_trainer')}</div><div class="lbl">متوسط تقييم المدرب</div></div>
     <div class="stat"><div class="num">${avg('rating_organization')}</div><div class="lbl">متوسط تقييم التنظيم</div></div>
   `;
+}
+
+async function loadTrackComparison(){
+  const { data } = await supabaseClient.rpc('get_track_report');
+  const rows = data || [];
+  document.getElementById('compareTbody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.track_name}</td>
+      <td>${r.participant_count}</td>
+      <td>${r.full_attendance_count}</td>
+      <td>${r.certified_count}</td>
+      <td>${r.avg_rating ?? '—'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:16px;">لا توجد بيانات بعد</td></tr>';
 }
 
 function renderCharts(){

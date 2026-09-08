@@ -209,6 +209,23 @@
         <div id="dayActivationRows"></div>
       </div>
 
+      <div class="card" id="closingDayCard">
+        <h3>🎓 اليوم الختامي (فعالية واحدة لكل البرنامج)</h3>
+        <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
+          حفل ختامي واحد لكل المشاركين بغض النظر عن مسارهم. حضوره صار شرطًا إضافيًا لإصدار الشهادة.
+        </p>
+        <div class="settings-row">
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--navy-2);margin:0;cursor:pointer;">
+            <input type="checkbox" id="closingDayActiveToggle" style="width:18px;height:18px;">
+            تفعيل تسجيل الحضور لليوم الختامي الآن
+          </label>
+        </div>
+        <label>تاريخ اليوم الختامي (اختياري، للعرض فقط)</label>
+        <input type="date" id="closingDayDate">
+        <button class="btn btn-navy" style="margin-top:12px;" onclick="saveClosingDaySettings()">حفظ</button>
+        <div class="msg" id="closingDayMsg" style="margin-top:10px;font-size:13px;"></div>
+      </div>
+
       <div class="card" id="trackRegControlCard">
         <h3>التحكم بالتسجيل لكل مسار</h3>
         <p style="font-size:13px;color:#6b7280;margin-top:-6px;">
@@ -241,7 +258,7 @@
             <tr>
               <th><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)"></th>
               <th>#</th><th>الاسم</th><th>البريد</th><th>الجوال</th><th>المسار</th>
-              <th>1</th><th>2</th><th>3</th><th>الشهادة</th><th>إجراءات</th>
+              <th>1</th><th>2</th><th>3</th><th>🎓</th><th>الشهادة</th><th>إجراءات</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -648,6 +665,9 @@ async function loadAll(){
   minAttendanceDays = settings ? settings.min_attendance_days : 2;
   document.getElementById('minDaysInput').value = minAttendanceDays;
 
+  document.getElementById('closingDayActiveToggle').checked = !!(settings && settings.closing_day_active);
+  document.getElementById('closingDayDate').value = (settings && settings.closing_day_date) || '';
+
   document.getElementById('regOpenToggle').checked = settings ? settings.registration_open !== false : true;
   document.getElementById('regOpensAt').value = toDatetimeLocal(settings && settings.registration_opens_at);
   document.getElementById('regClosesAt').value = toDatetimeLocal(settings && settings.registration_closes_at);
@@ -672,7 +692,8 @@ async function loadAll(){
 }
 
 function hasEvaluation(p){ return evaluatedIds.has(p.id); }
-function isEligibleForCertificate(p){ return attendedCount(p) >= minAttendanceDays && hasEvaluation(p); }
+function closingDayEligible(p){ return p.closing_day_attended === true; }
+function isEligibleForCertificate(p){ return closingDayEligible(p) && hasEvaluation(p); }
 
 async function loadFacilitators(){
   const { data } = await supabaseClient.from('profiles').select('*').eq('role', 'facilitator');
@@ -788,11 +809,12 @@ function renderTable(){
       <td>${dayCell(p, 1)}</td>
       <td>${dayCell(p, 2)}</td>
       <td>${dayCell(p, 3)}</td>
+      <td>${closingDayCell(p)}</td>
       <td>${p.certificate_issued
           ? `<span class="pill cert-pill">صادرة</span>`
           : (isEligibleForCertificate(p)
               ? `<button class="small-btn btn-gold" onclick="issueCertificate('${p.id}')">إصدار</button>`
-              : `<span class="pill off" title="${(attendedCount(p) < minAttendanceDays) ? 'لم يستوفِ الحد الأدنى للحضور' : 'لم يُكمل استبيان التقييم'}">غير مؤهّل</span>`)}</td>
+              : `<span class="pill off" title="${!closingDayEligible(p) ? 'لم يحضر اليوم الختامي' : 'لم يُكمل استبيان التقييم'}">غير مؤهّل</span>`)}</td>
       <td>
         ${p.certificate_issued ? `<a href="certificate.html?code=${p.certificate_code}" target="_blank" class="small-btn btn-outline">عرض</a>` : ''}
         <button class="small-btn btn-outline" onclick="openEditModal('${p.id}')">تعديل</button>
@@ -999,6 +1021,22 @@ function dayCell(p, n){
   </div>`;
 }
 
+function closingDayCell(p){
+  const val = p.closing_day_attended; // true | false | null
+  return `<div class="day-btns">
+    <button class="day-btn present ${val===true?'active':''}" title="حضر اليوم الختامي" onclick="setClosingDayAttendance('${p.id}', true)">✓</button>
+    <button class="day-btn absent ${val===false?'active':''}" title="لم يحضر اليوم الختامي" onclick="setClosingDayAttendance('${p.id}', false)">✕</button>
+  </div>`;
+}
+
+async function setClosingDayAttendance(id, value){
+  const p = participants.find(x => x.id === id);
+  const newVal = (p.closing_day_attended === value) ? null : value;
+  const { error } = await supabaseClient.from('participants').update({ closing_day_attended: newVal }).eq('id', id);
+  if(!error){ p.closing_day_attended = newVal; renderStats(); renderTable(); }
+  else showToast('تعذّر الحفظ: ' + friendlyError(error), 'error');
+}
+
 async function setDay(id, n, value){
   const p = participants.find(x => x.id === id);
   const field = `day${n}_attended`;
@@ -1012,8 +1050,8 @@ function genCertCode(){ return 'INV-2026-' + Math.random().toString(36).slice(2,
 
 async function issueCertificate(id){
   const p = participants.find(x => x.id === id);
-  if(attendedCount(p) < minAttendanceDays){
-    showToast(`لا يمكن إصدار الشهادة: ${p.full_name} لم يستوفِ الحد الأدنى للحضور (${minAttendanceDays} من 3 أيام)`, 'error');
+  if(!closingDayEligible(p)){
+    showToast(`لا يمكن إصدار الشهادة: ${p.full_name} لم يحضر اليوم الختامي.`, 'error');
     return;
   }
   if(!hasEvaluation(p)){
@@ -1028,8 +1066,8 @@ async function issueCertificate(id){
 
 async function issueSelectedCertificates(){
   const eligible = participants.filter(p => isEligibleForCertificate(p) && !p.certificate_issued);
-  if(!eligible.length){ showToast(`لا يوجد مشاركون مؤهّلون حاليًا (الحد الأدنى: ${minAttendanceDays} من 3 أيام + إكمال الاستبيان)`, 'info'); return; }
-  if(!confirm(`سيتم إصدار ${eligible.length} شهادة (حضور ${minAttendanceDays} من 3 أيام + استبيان مكتمل). متابعة؟`)) return;
+  if(!eligible.length){ showToast('لا يوجد مشاركون مؤهّلون حاليًا (شرط الإصدار: حضور اليوم الختامي + إكمال الاستبيان)', 'info'); return; }
+  if(!confirm(`سيتم إصدار ${eligible.length} شهادة (حضور اليوم الختامي + استبيان مكتمل). متابعة؟`)) return;
 
   for(const p of eligible){
     const code = genCertCode();
@@ -1341,6 +1379,20 @@ async function saveSettings(){
   msg.style.color = '#1e7a3f';
   msg.textContent = 'تم الحفظ';
   renderStats();
+}
+
+async function saveClosingDaySettings(){
+  const active = document.getElementById('closingDayActiveToggle').checked;
+  const dateVal = document.getElementById('closingDayDate').value || null;
+  const msg = document.getElementById('closingDayMsg');
+  const { error } = await supabaseClient.from('app_settings').update({
+    closing_day_active: active, closing_day_date: dateVal
+  }).eq('id', 1);
+  if(error){ msg.style.color = '#9c2b2b'; msg.textContent = 'تعذّر الحفظ: ' + friendlyError(error); return; }
+  msg.style.color = '#1e7a3f';
+  msg.textContent = 'تم الحفظ';
+  showToast('تم حفظ إعدادات اليوم الختامي', 'success');
+  renderStats(); renderTable();
 }
 
 // تحويل تاريخ ISO (من قاعدة البيانات) لصيغة datetime-local (بتوقيت الجهاز المحلي)

@@ -150,6 +150,7 @@
 
     <div class="ptab-content" id="ptab-overview">
       <div class="days" id="rDays"></div>
+      <div id="rClosingDayBox"></div>
 
       <div class="hours-card" id="hoursCard">
         <h3>ساعات التدريب المسجّلة</h3>
@@ -314,7 +315,7 @@ function getRating(containerId){
 function renderProgressTimeline(state){
   const steps = [
     { key: 'registered', label: 'التسجيل', icon: '1' },
-    { key: 'attendance', label: 'الحضور', icon: '2' },
+    { key: 'closingDay', label: 'اليوم الختامي', icon: '2' },
     { key: 'evaluation', label: 'التقييم', icon: '3' },
     { key: 'certificate', label: 'الشهادة', icon: '4' },
   ];
@@ -339,10 +340,9 @@ function renderResult(r){
   document.getElementById('rTrack').textContent = r.track_name;
 
   const attendedDaysCount = [r.day1_attended, r.day2_attended, r.day3_attended].filter(v => v === true).length;
-  const attendanceDone = attendedDaysCount >= minAttendanceDays;
   renderProgressTimeline({
     registered: true,
-    attendance: attendanceDone,
+    closingDay: r.closing_day_attended === true,
     evaluation: !!r.evaluation_submitted,
     certificate: !!r.certificate_issued,
   });
@@ -357,6 +357,14 @@ function renderResult(r){
     const text = d.val === true ? 'حاضر ✓' : (d.val === false ? 'لم يحضر' : 'قريبًا');
     return `<div class="day ${cls}"><div class="lbl">${d.label}</div>${text}</div>`;
   }).join('');
+
+  {
+    const cv = r.closing_day_attended;
+    const cls = cv === true ? 'present' : (cv === false ? 'absent' : 'pending');
+    const text = cv === true ? 'حضرتَه ✓' : (cv === false ? 'لم تحضره' : 'لم يُحدَّد بعد');
+    document.getElementById('rClosingDayBox').innerHTML =
+      `<div class="day ${cls}" style="margin-top:8px;"><div class="lbl">🎓 اليوم الختامي</div>${text}</div>`;
+  }
 
   const HOURS_PER_DAY = 4;
   const TOTAL_POSSIBLE = days.length * HOURS_PER_DAY;
@@ -384,12 +392,11 @@ function renderResult(r){
         🎉 مبروك! شهادتك جاهزة
         <br><a class="btn" href="certificate.html?code=${r.certificate_code}" target="_blank">عرض وتحميل الشهادة</a>
       </div>`;
-  } else if(attendedCount < minAttendanceDays){
+  } else if(r.closing_day_attended !== true){
     evalCard.classList.add('hide');
     certBox.innerHTML = `
       <div class="cert-box notready">
-        استبيان التقييم وإصدار الشهادة يظهران بعد استيفاء الحد الأدنى للحضور.
-        (حضورك الحالي: ${attendedCount} من 3 — المطلوب: ${minAttendanceDays})
+        استبيان التقييم وإصدار الشهادة يظهران بعد تسجيل حضورك لليوم الختامي.
       </div>`;
   } else if(!r.evaluation_submitted){
     certBox.innerHTML = '';
@@ -433,7 +440,7 @@ async function submitEvaluationInline(){
   }
 
   document.getElementById('evalCard').classList.add('hide');
-  renderProgressTimeline({ registered: true, attendance: true, evaluation: true, certificate: false });
+  renderProgressTimeline({ registered: true, closingDay: true, evaluation: true, certificate: false });
   await requestCertificate();
 }
 
@@ -447,7 +454,7 @@ async function requestCertificate(){
     return;
   }
 
-  renderProgressTimeline({ registered: true, attendance: true, evaluation: true, certificate: true });
+  renderProgressTimeline({ registered: true, closingDay: true, evaluation: true, certificate: true });
   certBox.innerHTML = `
     <div class="cert-box ready">
       🎉 مبروك! شهادتك جاهزة

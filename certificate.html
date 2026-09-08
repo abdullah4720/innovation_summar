@@ -112,8 +112,8 @@
 
         <p>يتقدم مركز الابتكار والملكية الفكرية بجامعة القصيم بالشكر والتقدير إلى</p>
         <p class="cert-name" id="cName"></p>
-        <p>على مشاركتكم المتميّزة في صيف الابتكار 2026، وذلك ضمن مسار <b id="cTrack" style="color:var(--navy);"></b></p>
-        <p>والذي أُقيم خلال الفترة من <span id="cDates"></span> في جامعة القصيم.</p>
+        <p>على مشاركتكم المتميّزة في حفل ختام برنامج صيف الابتكار 2026، وذلك في <b id="cTrack" style="color:var(--navy);"></b></p>
+        <p>والذي أُقيم بتاريخ <span id="cDates"></span> في جامعة القصيم.</p>
         <p>متمنين لكم دوام التوفيق والنجاح في مسيرتكم الريادية والعلمية.</p>
 
         <div class="cert-footer">
@@ -149,15 +149,14 @@ async function lookup(){
   const c = data[0];
   document.getElementById('cName').textContent = c.full_name;
   document.getElementById('cTrack').textContent = c.track_name;
-  document.getElementById('cDates').textContent = formatRange(c.day1_date, c.day3_date);
+  document.getElementById('cDates').textContent = formatSingleDate(c.closing_day_date);
   document.getElementById('certWrap').classList.add('show');
 }
 
-function formatRange(d1, d3){
+function formatSingleDate(d){
+  if(!d) return '—';
   const opts = {day:'numeric', month:'long', year:'numeric'};
-  const a = new Date(d1).toLocaleDateString('ar-SA', opts);
-  const b = new Date(d3).toLocaleDateString('ar-SA', opts);
-  return `${a} إلى ${b}`;
+  return new Date(d).toLocaleDateString('ar-SA', opts);
 }
 
 async function downloadPdf(){

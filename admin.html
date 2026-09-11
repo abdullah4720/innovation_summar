@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة التحكم | صيف الابتكار 2026</title>
+<title>لوحة التحكم | صناع الحلول الابتكارية 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -11,7 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
-  :root{--navy:#0B1B3F;--navy-2:#132a5c;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;
+  :root{--navy:#0B1B3F;--navy-2:#132a5c;--gold:#14B8A6;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;
     --surface:#fff;--text:#1c2230;--text-muted:#6b7280;--table-head:#0B1B3F;--row-hover:#fffdf3;}
   body.dark{--cream:#161b2b;--surface:#1f2438;--text:#e8e6df;--text-muted:#9aa0b4;
     --line:#2e3450;--navy-2:#3a4a7a;--table-head:#12172a;--row-hover:#252a42;}
@@ -172,7 +172,7 @@
 
 <div id="app" class="hide">
   <div class="topbar">
-    <h1>لوحة تحكم صيف الابتكار 2026</h1>
+    <h1>لوحة تحكم صناع الحلول الابتكارية 2026</h1>
     <div class="right">
       <a href="report.html" style="text-decoration:none;"><button style="border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;">📊 التقرير الشامل</button></a>
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="الوضع الليلي">🌙</button>
@@ -327,8 +327,8 @@
         <p style="font-size:12.5px;color:#6b7280;margin-top:-6px;">هذا الشكل التقريبي اللي بيوصل المشارك بالبريد وبوابته</p>
         <div class="ann-preview-shell">
           <div class="ann-preview-banner">
-            <div style="color:#E7B10A;font-size:18px;font-weight:900;">صيف الابتكار</div>
-            <div style="color:#E7B10A;font-size:11px;font-weight:700;">Innovation Summer 2026</div>
+            <div style="color:#14B8A6;font-size:18px;font-weight:900;">صناع الحلول الابتكارية</div>
+            <div style="color:#14B8A6;font-size:11px;font-weight:700;">Innovative Solutions Makers</div>
           </div>
           <div class="ann-preview-body">
             <div style="font-weight:800;color:var(--navy);font-size:15px;margin-bottom:8px;" id="previewTitle">📢 عنوان الرسالة</div>
@@ -466,7 +466,7 @@
         <input type="datetime-local" id="regClosesAt">
 
         <label>رسالة الإغلاق المخصصة (اختياري)</label>
-        <textarea id="regClosedMessage" rows="3" placeholder="مثال: انتهى التسجيل لهذا العام، نشوفكم في صيف الابتكار القادم بإذن الله!"
+        <textarea id="regClosedMessage" rows="3" placeholder="مثال: انتهى التسجيل لهذا العام، نشوفكم في صناع الحلول الابتكارية القادم بإذن الله!"
           style="width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:10px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
         <p style="font-size:12px;color:#6b7280;margin-top:4px;">اتركها فارغة لاستخدام الرسائل الافتراضية المناسبة لكل حالة (مغلق يدويًا / لم يبدأ بعد / انتهى الوقت).</p>
 
@@ -1151,7 +1151,7 @@ async function printQRCodes(){
 
   const win = window.open('', '_blank');
   win.document.write(`
-    <html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>رموز QR — صيف الابتكار 2026</title>
+    <html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>رموز QR — صناع الحلول الابتكارية 2026</title>
     <style>
       body{font-family:sans-serif;padding:20px;}
       .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;}
@@ -1162,7 +1162,7 @@ async function printQRCodes(){
       @media print{ body{padding:0;} }
     </style></head>
     <body>
-      <h2 style="text-align:center;">رموز QR — صيف الابتكار 2026 (${list.length})</h2>
+      <h2 style="text-align:center;">رموز QR — صناع الحلول الابتكارية 2026 (${list.length})</h2>
       <div class="grid">${cards.join('')}</div>
       <script>window.onload = () => window.print();<\/script>
     </body></html>
@@ -1494,7 +1494,7 @@ function renderCharts(){
   Object.values(charts).forEach(c => c.destroy());
 
   const labels = tracks.map(t => t.name_ar);
-  const gold = '#E7B10A', navy = '#0B1B3F';
+  const gold = '#14B8A6', navy = '#0B1B3F';
 
   charts.tracks = new Chart(document.getElementById('chartTracks'), {
     type: 'bar',
@@ -1529,7 +1529,7 @@ function renderCharts(){
   const topOrgs = Object.entries(orgCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
   charts.orgs = new Chart(document.getElementById('chartOrgs'), {
     type: 'pie',
-    data: { labels: topOrgs.map(o=>o[0]), datasets: [{ data: topOrgs.map(o=>o[1]), backgroundColor: ['#0B1B3F','#E7B10A','#5b6b98','#f0cf6b','#8a99c4','#c9a544'] } ] },
+    data: { labels: topOrgs.map(o=>o[0]), datasets: [{ data: topOrgs.map(o=>o[1]), backgroundColor: ['#0B1B3F','#14B8A6','#5b6b98','#f0cf6b','#8a99c4','#c9a544'] } ] },
     options: { plugins:{legend:{position:'bottom', labels:{font:{size:11}}}} }
   });
 }

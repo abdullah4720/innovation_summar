@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>التسجيل | صيف الابتكار 2026</title>
+<title>التسجيل | صناع الحلول الابتكارية 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --navy:#0B1B3F; --navy-2:#132a5c; --gold:#E7B10A; --gold-2:#f7cf4d;
+    --navy:#0B1B3F; --navy-2:#132a5c; --gold:#14B8A6; --gold-2:#f7cf4d;
     --cream:#FBF6E9; --ink:#1c2230; --line:#e7ddc0;
   }
   *{box-sizing:border-box;}
@@ -53,6 +53,14 @@
   .track-opt.disabled .track-card{opacity:.5;background:#f1f1ec;cursor:not-allowed;}
   .track-badge{display:inline-block;background:#9ca3af;color:#fff;font-size:10.5px;font-weight:700;
     padding:1px 7px;border-radius:999px;margin-right:6px;vertical-align:middle;}
+  .waitlist-link{margin-top:6px;font-size:11.5px;color:var(--navy);font-weight:700;text-decoration:underline;cursor:pointer;}
+
+  .waitlist-modal-bg{position:fixed;inset:0;background:rgba(11,27,63,.45);display:flex;align-items:center;
+    justify-content:center;z-index:100;padding:16px;}
+  .waitlist-modal{background:#fff;border-radius:16px;padding:22px;max-width:360px;width:100%;}
+  .waitlist-modal h3{margin:0 0 4px;color:var(--navy);}
+  .waitlist-modal label{display:block;font-size:13px;font-weight:600;margin:10px 0 5px;color:#132a5c;}
+  .waitlist-modal input{width:100%;padding:10px;border:1.5px solid #dcd3b8;border-radius:9px;font-family:inherit;font-size:14px;}
   .track-card{
     border:1.5px solid #dcd3b8;border-radius:12px;padding:12px 14px;background:#fffdf7;cursor:pointer;
   }
@@ -87,8 +95,9 @@
 <div class="hero">
   <div class="hero-inner">
     <div class="eyebrow">جامعة القصيم · مركز الابتكار والملكية الفكرية</div>
-    <h1>صيف الابتكار</h1>
-    <div class="sub">Innovation Summer — التسجيل في البرنامج التدريبي</div>
+    <h1>صناع الحلول الابتكارية</h1>
+    <div class="sub">Innovative Solutions Makers — التسجيل في البرنامج التدريبي</div>
+    <div class="sub" style="font-size:13px;opacity:.85;margin-top:2px;">نحو حلول مبتكرة تصنع أثرًا مستدامًا</div>
     <div class="badge-year">2026</div>
   </div>
 </div>
@@ -133,6 +142,25 @@
     <a class="submit" href="participant.html" style="display:block;text-align:center;text-decoration:none;margin-top:6px;">فتح بوابة المشارك</a>
   </div>
 </main>
+
+<div class="waitlist-modal-bg hide" id="waitlistModal">
+  <div class="waitlist-modal">
+    <h3>الانضمام لقائمة الانتظار</h3>
+    <p style="font-size:13px;color:#6b7280;margin-top:-6px;">مسار: <b id="waitlistTrackName"></b></p>
+    <input type="hidden" id="waitlistTrackId">
+    <label>الاسم الكامل</label>
+    <input type="text" id="waitlistName">
+    <label>البريد الإلكتروني</label>
+    <input type="email" id="waitlistEmail" dir="ltr" style="text-align:right;">
+    <label>رقم الجوال</label>
+    <input type="tel" id="waitlistPhone" dir="ltr" style="text-align:right;" placeholder="05xxxxxxxx">
+    <div class="msg" id="waitlistMsg" style="display:none;"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="submit" style="background:#fff;border:1.5px solid var(--navy);color:var(--navy);" onclick="closeWaitlist()">إغلاق</button>
+      <button class="submit" onclick="submitWaitlist()">انضمام</button>
+    </div>
+  </div>
+</div>
 
 <script src="config.js"></script>
 <script>
@@ -188,6 +216,7 @@ async function loadTracks(){
     if(isFirst) firstEnabledUsed = true;
 
     const badge = isClosed ? '<span class="track-badge">مغلق</span>' : (isFull ? '<span class="track-badge">مكتمل</span>' : '');
+    const waitlistLink = unavailable ? `<div class="waitlist-link" onclick="openWaitlist(event, '${tid}', '${t.name_ar.replace(/'/g,"")}')">🕐 انضم لقائمة الانتظار</div>` : '';
 
     return `
     <label class="track-opt ${unavailable ? 'disabled' : ''}">
@@ -195,9 +224,44 @@ async function loadTracks(){
       <div class="track-card">
         <div class="track-name">${t.name_ar} ${badge}</div>
         ${t.day1_date ? `<div class="track-dates">${formatRange(t.day1_date, t.day3_date)}</div>` : ''}
+        ${waitlistLink}
       </div>
     </label>`;
   }).join('');
+}
+
+function openWaitlist(e, trackId, trackName){
+  e.preventDefault(); e.stopPropagation();
+  document.getElementById('waitlistTrackId').value = trackId;
+  document.getElementById('waitlistTrackName').textContent = trackName;
+  document.getElementById('waitlistModal').classList.remove('hide');
+}
+function closeWaitlist(){
+  document.getElementById('waitlistModal').classList.add('hide');
+  document.getElementById('waitlistMsg').style.display = 'none';
+}
+async function submitWaitlist(){
+  const trackId = document.getElementById('waitlistTrackId').value;
+  const full_name = document.getElementById('waitlistName').value.trim();
+  const email = document.getElementById('waitlistEmail').value.trim();
+  const phone = document.getElementById('waitlistPhone').value.trim();
+  const msg = document.getElementById('waitlistMsg');
+
+  if(!full_name || !email || !phone){
+    msg.className = 'msg error'; msg.style.display = 'block';
+    msg.textContent = 'الرجاء تعبئة كل الحقول'; return;
+  }
+
+  const { error } = await supabaseClient.from('waitlist').insert({ track_id: trackId, full_name, email, phone });
+  if(error){
+    msg.className = 'msg error'; msg.style.display = 'block';
+    msg.textContent = 'تعذّر الإضافة، حاول مرة أخرى'; return;
+  }
+  msg.className = 'msg success'; msg.style.display = 'block'; msg.style.background = '#e8f6ec'; msg.style.color = '#1e7a3f';
+  msg.textContent = 'تمت إضافتك لقائمة الانتظار، بنتواصل معك لو فتح مكان.';
+  document.getElementById('waitlistName').value = '';
+  document.getElementById('waitlistEmail').value = '';
+  document.getElementById('waitlistPhone').value = '';
 }
 
 function formatRange(d1, d3){

@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>الإحصائيات العامة | صيف الابتكار 2026</title>
+<title>الإحصائيات العامة | صناع الحلول الابتكارية 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  :root{--navy:#0B1B3F;--gold:#E7B10A;--gold-2:#f7cf4d;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;}
+  :root{--navy:#0B1B3F;--gold:#14B8A6;--gold-2:#f7cf4d;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;}
   *{box-sizing:border-box;}
   body{margin:0;background:var(--cream);color:var(--ink);font-family:'IBM Plex Sans Arabic',sans-serif;}
   h1,h2,h3{font-weight:800;}
@@ -39,7 +39,7 @@
 
 <div class="hero">
   <div class="hero-inner">
-    <h1>صيف الابتكار 2026 — الأثر بالأرقام</h1>
+    <h1>صناع الحلول الابتكارية 2026 — الأثر بالأرقام</h1>
     <div class="sub">جامعة القصيم · مركز الابتكار والملكية الفكرية</div>
   </div>
 </div>
@@ -57,11 +57,17 @@
 <script src="config.js"></script>
 <script>
 async function loadStats(){
-  const { data: statsData } = await supabaseClient.rpc('get_public_stats');
+  const [{ data: statsData }, { data: attData }] = await Promise.all([
+    supabaseClient.rpc('get_public_stats'),
+    supabaseClient.rpc('get_attendance_stat'),
+  ]);
   const s = (statsData && statsData[0]) || {};
+  const a = (attData && attData[0]) || {};
 
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat"><div class="num">${s.total_participants ?? 0}</div><div class="lbl">إجمالي المشاركين</div></div>
+    <div class="stat"><div class="num">${a.attendance_rate ?? 0}%</div><div class="lbl">نسبة الحضور</div></div>
+    <div class="stat"><div class="num">${a.fully_attended_count ?? 0}</div><div class="lbl">أتمّوا الحضور الكامل</div></div>
     <div class="stat"><div class="num">${s.total_hours ?? 0}</div><div class="lbl">ساعة تدريبية مُنجزة</div></div>
     <div class="stat"><div class="num">${s.certificates_issued ?? 0}</div><div class="lbl">شهادة صادرة</div></div>
     <div class="stat"><div class="num">${s.avg_satisfaction ?? '—'}</div><div class="lbl">متوسط رضا المشاركين (5)</div></div>
@@ -74,7 +80,7 @@ async function loadStats(){
 
   new Chart(document.getElementById('chartTracks'), {
     type: 'bar',
-    data: { labels, datasets: [{ data: counts, backgroundColor: '#E7B10A' }] },
+    data: { labels, datasets: [{ data: counts, backgroundColor: '#14B8A6' }] },
     options: { plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{precision:0}}} }
   });
 }

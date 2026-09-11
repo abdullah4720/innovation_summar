@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تسجيل الحضور | صيف الابتكار 2026</title>
+<title>تسجيل الحضور | صناع الحلول الابتكارية 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-  :root{--navy:#0B1B3F;--gold:#E7B10A;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;
+  :root{--navy:#0B1B3F;--gold:#14B8A6;--cream:#FBF6E9;--ink:#1c2230;--line:#e7ddc0;
     --surface:#fff;--text:#1c2230;--table-head:#0B1B3F;}
   body.dark{--cream:#161b2b;--surface:#1f2438;--text:#e8e6df;--line:#2e3450;--table-head:#12172a;}
   body.dark{background:var(--cream);color:var(--text);}
@@ -59,7 +59,7 @@
 </head>
 <body>
 <div class="topbar">
-  <h1>تسجيل الحضور — صيف الابتكار</h1>
+  <h1>تسجيل الحضور — صناع الحلول الابتكارية</h1>
   <div style="display:flex;align-items:center;gap:10px;">
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">🌙</button>
     <span id="whoami" dir="ltr" style="font-size:13px;opacity:.85;"></span>
@@ -98,6 +98,7 @@
       <div class="pname" id="rName"></div>
       <div class="ptrack" id="rTrack"></div>
       <div class="days" id="rDays"></div>
+      <div class="days" id="rClosingDay" style="margin-top:8px;"></div>
       <div class="msg hide" id="resultMsg"></div>
       <button class="btn-outline" style="margin-top:14px;" onclick="resetScan()">مسح مشارك آخر</button>
     </div>
@@ -124,6 +125,7 @@ let currentTrack = null;
 let html5QrCode = null;
 
 let myRole = null;
+let closingDayActive = false;
 
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
   if(session){
@@ -133,6 +135,9 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
 
     const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', session.user.id).single();
     myRole = profile ? profile.role : null;
+
+    const { data: settings } = await supabaseClient.from('app_settings').select('closing_day_active').eq('id', 1).single();
+    closingDayActive = !!(settings && settings.closing_day_active);
 
     // نشغّل الكاميرا فقط لما المستخدم يفتح قسم "لديه رمز QR"، حتى لا تفشل داخل عنصر details مغلق
     const detailsEl = document.querySelector('#scanArea details');
@@ -255,7 +260,35 @@ function renderParticipant(autoMarkToday){
     </div>`;
   }).join('');
   document.getElementById('rDays').innerHTML = daysHtml;
+
+  const closingVal = currentParticipant.closing_day_attended;
+  const closingActiveNow = myRole === 'admin' || closingDayActive;
+  const closingDisabledAttr = closingActiveNow ? '' : 'disabled title="اليوم الختامي غير مفعّل بعد من المدير"';
+  document.getElementById('rClosingDay').innerHTML = `
+    <div class="day-pill">
+      🎓 اليوم الختامي
+      <div class="day-buttons">
+        <button class="day-btn present ${closingVal===true?'active':''}" ${closingDisabledAttr} onclick="setClosingDay(true)">✓</button>
+        <button class="day-btn absent ${closingVal===false?'active':''}" ${closingDisabledAttr} onclick="setClosingDay(false)">✕</button>
+      </div>
+    </div>`;
+
   document.getElementById('resultMsg').classList.add('hide');
+}
+
+async function setClosingDay(value){
+  if(myRole !== 'admin' && !closingDayActive){
+    showResultMsg('اليوم الختامي غير مفعّل بعد. تواصل مع المدير لتفعيله.', false);
+    return;
+  }
+  const newVal = (currentParticipant.closing_day_attended === value) ? null : value;
+  const { error } = await supabaseClient.from('participants')
+    .update({ closing_day_attended: newVal }).eq('id', currentParticipant.id);
+
+  if(error){ showResultMsg('تعذّر تحديث الحضور', false); return; }
+  currentParticipant.closing_day_attended = newVal;
+  renderParticipant(false);
+  showResultMsg(newVal === true ? 'تم تسجيل حضور اليوم الختامي ✅' : (newVal === false ? 'تم تسجيله كغائب' : 'تم إلغاء التحديد'), true);
 }
 
 async function setDay(dayNum, value, silent){
